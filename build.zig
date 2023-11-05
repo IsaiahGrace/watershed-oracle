@@ -15,40 +15,47 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const name = "watershedOracle";
-
-    const exe = b.addExecutable(.{
-        .name = name,
-        .root_source_file = .{ .path = "src/main.zig" },
+    // The CLI app takes a point from stdin, and prints the watershed data to stdout.
+    // Used to develop and debug the system.
+    const cli = b.addExecutable(.{
+        .name = "watershedOracleCLI",
+        .root_source_file = .{ .path = "src/cli.zig" },
         .target = target,
         .optimize = optimize,
     });
+    cli.linkLibC();
+    cli.linkSystemLibrary("geos_c");
+    cli.linkSystemLibrary("sqlite3");
+    b.installArtifact(cli);
 
-    const lib = b.addStaticLibrary(.{
-        .name = name,
-        .root_source_file = .{ .path = "src/lib.zig" },
+    // The Telegram Bot takes a location data from a telegram chat and replies with the watershed data
+    const bot = b.addExecutable(.{
+        .name = "watershedOracleTelegramBot",
+        .root_source_file = .{ .path = "src/telegramBot.zig" },
         .target = target,
         .optimize = optimize,
     });
+    bot.linkLibC();
+    bot.linkSystemLibrary("geos_c");
+    bot.linkSystemLibrary("sqlite3");
+    b.installArtifact(bot);
 
-    exe.linkLibC();
-    exe.linkSystemLibrary("geos_c");
-    exe.linkSystemLibrary("sqlite3");
-
-    lib.linkLibC();
-    lib.linkSystemLibrary("geos_c");
-    lib.linkSystemLibrary("sqlite3");
-
-    // This declares intent for the executable to be installed into the
-    // standard location when the user invokes the "install" step (the default
-    // step when running `zig build`).
-    b.installArtifact(exe);
-    b.installArtifact(lib);
+    // The Server executable is long-running and tracks the watershed of a single point as it moves over time.
+    const server = b.addExecutable(.{
+        .name = "watershedOracleServer",
+        .root_source_file = .{ .path = "src/server.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    server.linkLibC();
+    server.linkSystemLibrary("geos_c");
+    server.linkSystemLibrary("sqlite3");
+    b.installArtifact(server);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
     // such a dependency.
-    const run_cmd = b.addRunArtifact(exe);
+    const run_cmd = b.addRunArtifact(cli);
 
     // By making the run step depend on the install step, it will be run from the
     // installation directory rather than directly from within the cache directory.

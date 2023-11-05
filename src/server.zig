@@ -1,7 +1,6 @@
 const std = @import("std");
-const cincludes = @import("cincludes.zig");
-const geos = @import("geos.zig");
-const sqlite = cincludes.sqlite;
+const geosUtil = @import("geosUtil.zig");
+const sqlite = @cImport(@cInclude("sqlite3.h"));
 
 pub fn main() !void {
     std.log.info("sqlite version: {s}", .{sqlite.SQLITE_VERSION});
@@ -11,6 +10,6 @@ pub fn main() !void {
 
     const allocator: std.mem.Allocator = gpa.allocator();
 
-    geos.initGeos(allocator);
-    defer geos.deinitGeos();
+    geosUtil.initGeos(allocator);
+    defer geosUtil.deinitGeos();
 }
