@@ -1,7 +1,7 @@
 const std = @import("std");
 const geosUtil = @import("geosUtil.zig");
 const sqlite = @cImport(@cInclude("sqlite3.h"));
-const WBD = @import("WBD.zig");
+const wbd = @import("wbd.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -12,6 +12,6 @@ pub fn main() !void {
     geosUtil.initGeos(allocator);
     defer geosUtil.deinitGeos();
 
-    var wbd = try WBD.GeoPackage.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
-    defer wbd.deinit();
+    var dataset = try wbd.Wbd.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
+    defer dataset.deinit();
 }

@@ -4,33 +4,33 @@ const sqliteErrors = @import("sqliteErrors.zig");
 
 // This struct is a helper abstraction on the SQLite3 DB for the USGS Watershed Boundary Dataset (WBD)
 // The dataset is available for download here: https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Hydrography/WBD/National/GPKG/
-pub const GeoPackage = struct {
+pub const Wbd = struct {
     connection: *sqlite.sqlite3, // opaque pointer to SQLite3 database object
 
-    pub fn init(path: [*:0]const u8) !GeoPackage {
+    pub fn init(path: [*:0]const u8) !Wbd {
         std.log.info("sqlite version: {s}", .{sqlite.SQLITE_VERSION});
 
         var connectionPointer: ?*sqlite.sqlite3 = null;
         try sqliteErrors.check(sqlite.sqlite3_open_v2(@ptrCast(path), &connectionPointer, sqlite.SQLITE_OPEN_READONLY, null));
         if (connectionPointer == null) return error.sqliteOOM;
 
-        return GeoPackage{
+        return Wbd{
             .connection = connectionPointer.?,
         };
     }
 
-    pub fn deinit(self: *const GeoPackage) void {
+    pub fn deinit(self: *const Wbd) void {
         sqliteErrors.log(sqlite.sqlite3_close(self.connection));
     }
 };
 
 test "Test DB Open and close" {
-    const wbd = try GeoPackage.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
+    const wbd = try Wbd.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
     defer wbd.deinit();
 }
 
 test "Select the name of HUC 22" {
-    const wbd = try GeoPackage.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
+    const wbd = try Wbd.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
     defer wbd.deinit();
 
     var statement: ?*sqlite.sqlite3_stmt = null;
