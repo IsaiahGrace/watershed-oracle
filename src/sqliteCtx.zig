@@ -4,38 +4,37 @@ const sqliteErrors = @import("sqliteErrors.zig");
 
 // This struct is a helper abstraction on the SQLite3 DB for the USGS Watershed Boundary Dataset (WBD)
 // The dataset is available for download here: https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Hydrography/WBD/National/GPKG/
-pub const Wbd = struct {
-    connection: *sqlite.sqlite3, // opaque pointer to SQLite3 database object
+pub const SqliteCtx = struct {
+    conn: ?*sqlite.sqlite3, // opaque pointer to SQLite3 database object
 
-    pub fn init(path: [*:0]const u8) !Wbd {
-        std.log.info("sqlite version: {s}", .{sqlite.SQLITE_VERSION});
-
+    pub fn init(path: [*:0]const u8) !SqliteCtx {
         var connectionPointer: ?*sqlite.sqlite3 = null;
         try sqliteErrors.check(sqlite.sqlite3_open_v2(@ptrCast(path), &connectionPointer, sqlite.SQLITE_OPEN_READONLY, null));
         if (connectionPointer == null) return error.sqliteOOM;
 
-        return Wbd{
-            .connection = connectionPointer.?,
+        return SqliteCtx{
+            .conn = connectionPointer,
         };
     }
 
-    pub fn deinit(self: *const Wbd) void {
-        sqliteErrors.log(sqlite.sqlite3_close(self.connection));
+    pub fn deinit(self: *SqliteCtx) void {
+        sqliteErrors.log(sqlite.sqlite3_close(self.conn));
+        self.conn = null;
     }
 };
 
 test "Test DB Open and close" {
-    const wbd = try Wbd.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
-    defer wbd.deinit();
+    var sctx = try SqliteCtx.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
+    defer sctx.deinit();
 }
 
 test "Select the name of HUC 22" {
-    const wbd = try Wbd.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
-    defer wbd.deinit();
+    var sctx = try SqliteCtx.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
+    defer sctx.deinit();
 
     var statement: ?*sqlite.sqlite3_stmt = null;
     const query = "SELECT name FROM \"WBDHU2\" WHERE \"huc2\" IS '22';";
-    try sqliteErrors.check(sqlite.sqlite3_prepare_v2(wbd.connection, query, query.len, &statement, null));
+    try sqliteErrors.check(sqlite.sqlite3_prepare_v2(sctx.conn, query, query.len, &statement, null));
     defer sqliteErrors.log(sqlite.sqlite3_finalize(statement));
 
     try std.testing.expectEqual(sqlite.SQLITE_ROW, sqlite.sqlite3_step(statement));
