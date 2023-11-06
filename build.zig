@@ -82,6 +82,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    unit_tests.linkLibC();
+    unit_tests.linkSystemLibrary("geos_c");
+    unit_tests.linkSystemLibrary("sqlite3");
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 

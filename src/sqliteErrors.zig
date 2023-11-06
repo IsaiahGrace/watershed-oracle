@@ -1,5 +1,13 @@
 const std = @import("std");
 
+// Prints an error, if applicable, but does not propagate it.
+pub fn log(err: c_int) void {
+    check(err) catch |e| {
+        std.log.err("{s} --- https://www.sqlite.org/rescode.html", .{@errorName(e)});
+    };
+}
+
+// Converts an sqlite3 return code into a zig error, if applicable.
 pub fn check(err: c_int) SqliteError!void {
     const errEnum: SqliteErrorEnum = @enumFromInt(err);
     switch (errEnum) {
