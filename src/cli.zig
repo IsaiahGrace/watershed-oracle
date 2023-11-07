@@ -13,11 +13,11 @@ pub fn main() !void {
     var watershedStack = try watershed.WatershedStack.init(allocator, "/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
     defer watershedStack.deinit();
 
-    try watershedStack.updateWKT("POINT(12 56)");
+    try watershedStack.updateWKT("POINT(-77.9510 39.7624)");
     watershedStack.logPoint();
     watershedStack.logStack();
 
-    try watershedStack.updateXY(1234.0, 4321.0);
-    watershedStack.logPoint();
-    watershedStack.logStack();
+    // try watershedStack.updateXY(-77.047819, 38.927751);
+    // watershedStack.logPoint();
+    // watershedStack.logStack();
 }

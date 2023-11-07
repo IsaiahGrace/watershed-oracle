@@ -7,6 +7,16 @@ pub fn log(err: c_int) void {
     };
 }
 
+// Some special logic for running sqlite3_step(), return ROW and DONE, raise others as error
+pub fn stepCheck(err: c_int) SqliteError!c_int {
+    const errEnum: SqliteErrorEnum = @enumFromInt(err);
+    switch (errEnum) {
+        .SQLITE_ROW, .SQLITE_DONE => return err,
+        else => try check(err),
+    }
+    return error.UnknownSQLiteError;
+}
+
 // Converts an sqlite3 return code into a zig error, if applicable.
 pub fn check(err: c_int) SqliteError!void {
     const errEnum: SqliteErrorEnum = @enumFromInt(err);
@@ -43,9 +53,11 @@ pub fn check(err: c_int) SqliteError!void {
         .SQLITE_ROW => return, // This is a non-error return code
         .SQLITE_DONE => return, // This is a non-error return code
     }
+    return error.UnknownSQLiteError;
 }
 
 const SqliteError = error{
+    UnknownSQLiteError,
     SQLITE_ERROR,
     SQLITE_INTERNAL,
     SQLITE_PERM,
