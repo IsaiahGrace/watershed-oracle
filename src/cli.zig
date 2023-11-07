@@ -13,15 +13,23 @@ pub fn main() !void {
     var watershedStack = try watershed.WatershedStack.init(allocator, "/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
     defer watershedStack.deinit();
 
+    // In PA, near Hagerstown
     try watershedStack.updateWKT("POINT(-77.9510 39.7624)");
     try watershedStack.logPoint();
     try watershedStack.logStack();
 
+    // In the national zoo, DC
     try watershedStack.updateXY(-77.047819, 38.927751);
     try watershedStack.logPoint();
     try watershedStack.logStack();
 
+    // My apartment building
     try watershedStack.updateXY(-77.0369476121013, 38.93417495243022);
+    try watershedStack.logPoint();
+    try watershedStack.logStack();
+
+    // Ocean Park, ME
+    try watershedStack.updateXY(-70.38678136034306, 43.501440458688094);
     try watershedStack.logPoint();
     try watershedStack.logStack();
 }
