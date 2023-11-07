@@ -4,13 +4,19 @@ const std = @import("std");
 const watershed = @import("watershed.zig");
 
 pub fn main() !void {
-    std.log.info("Start CLI", .{});
+    if (std.os.argv.len < 2) {
+        std.log.err("Provide full path to WBD_National_GPKG.gpkg", .{});
+        std.log.err("NOTE: sqlite3 does not support ~/", .{});
+        std.log.err("Try:", .{});
+        std.log.err("zig build run -- /home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg", .{});
+        return error.NoArgs;
+    }
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa.deinit() == .leak) std.log.err("GPA detected a leak!", .{});
     const allocator: std.mem.Allocator = gpa.allocator();
 
-    var watershedStack = try watershed.WatershedStack.init(allocator, "/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
+    var watershedStack = try watershed.WatershedStack.init(allocator, std.os.argv[1]);
     defer watershedStack.deinit();
 
     // In PA, near Hagerstown
