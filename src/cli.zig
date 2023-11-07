@@ -17,7 +17,7 @@ pub fn main() !void {
     watershedStack.logPoint();
     watershedStack.logStack();
 
-    // try watershedStack.updateXY(-77.047819, 38.927751);
-    // watershedStack.logPoint();
-    // watershedStack.logStack();
+    try watershedStack.updateXY(-77.047819, 38.927751);
+    watershedStack.logPoint();
+    watershedStack.logStack();
 }

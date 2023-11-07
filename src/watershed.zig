@@ -7,7 +7,7 @@ const sqliteErrors = @import("sqliteErrors.zig");
 const std = @import("std");
 
 const Watershed = struct {
-    huc: [12]u8,
+    huc: [16]u8,
     name: []const u8,
     geom: *geos_c.GEOSGeometry,
 };
@@ -258,53 +258,67 @@ pub const WatershedStack = struct {
 
     fn updateHUC4(self: *WatershedStack) !void {
         std.log.debug("{s}", .{@src().fn_name});
-        if (self.huc2 == null) return;
-        self.huc2 = try self.search("huc4", "WBDHU4", self.huc2.?.huc[0..2]);
-        return self.updateHUC6();
+        if (self.huc2) |huc2| {
+            self.huc4 = try self.search("huc4", "WBDHU4", huc2.huc[0..2]);
+            return self.updateHUC6();
+        }
     }
 
     fn updateHUC6(self: *WatershedStack) !void {
         std.log.debug("{s}", .{@src().fn_name});
-        if (self.huc4 == null) return;
-        return self.updateHUC8();
+        if (self.huc4) |huc4| {
+            self.huc6 = try self.search("huc6", "WBDHU6", huc4.huc[0..4]);
+            return self.updateHUC8();
+        }
     }
 
     fn updateHUC8(self: *WatershedStack) !void {
         std.log.debug("{s}", .{@src().fn_name});
-        if (self.huc6 == null) return;
-        return self.updateHUC10();
+        if (self.huc6) |huc6| {
+            self.huc8 = try self.search("huc8", "WBDHU8", huc6.huc[0..6]);
+            return self.updateHUC10();
+        }
     }
 
     fn updateHUC10(self: *WatershedStack) !void {
         std.log.debug("{s}", .{@src().fn_name});
-        if (self.huc8 == null) return;
-        return self.updateHUC12();
+        if (self.huc8) |huc8| {
+            self.huc10 = try self.search("huc10", "WBDHU10", huc8.huc[0..8]);
+            return self.updateHUC12();
+        }
     }
 
     fn updateHUC12(self: *WatershedStack) !void {
         std.log.debug("{s}", .{@src().fn_name});
-        if (self.huc10 == null) return;
-        return self.updateHUC14();
+        if (self.huc10) |huc10| {
+            self.huc12 = try self.search("huc12", "WBDHU12", huc10.huc[0..10]);
+            return self.updateHUC14();
+        }
     }
 
     fn updateHUC14(self: *WatershedStack) !void {
         std.log.debug("{s}", .{@src().fn_name});
-        if (self.huc12 == null) return;
-        return self.updateHUC16();
+        if (self.huc12) |huc12| {
+            self.huc14 = self.search("huc14", "WBDHU14", huc12.huc[0..12]) catch |err| {
+                switch (err) {
+                    error.pointNotInDataset => return,
+                    else => return err,
+                }
+            };
+            return self.updateHUC16();
+        }
     }
 
     fn updateHUC16(self: *WatershedStack) !void {
         std.log.debug("{s}", .{@src().fn_name});
-        // HUC levels 14 and 16 are not always available, if updateHUC14 was unable to find a
-        // watershed, don't bother looking for an HUC16 code, it won't exist.
-        if (self.huc14 == null) return;
+        if (self.huc14) |huc14| {
+            self.huc16 = try self.search("huc16", "WBDHU16", huc14.huc[0..14]);
+        }
     }
 
     fn search(self: *WatershedStack, hucLevel: []const u8, tableName: []const u8, likePattern: []const u8) !Watershed {
         const queryString = try std.fmt.allocPrintZ(self.allocator, "SELECT {s},name,shape FROM \"{s}\" WHERE \"{s}\" LIKE '{s}%';", .{ hucLevel, tableName, hucLevel, likePattern });
         defer self.allocator.free(queryString);
-
-        std.log.debug("SQL Query: {s}", .{queryString});
 
         var statement: ?*sqlite.sqlite3_stmt = null;
         try sqliteErrors.check(sqlite.sqlite3_prepare_v2(self.sctx.conn, queryString, @intCast(queryString.len), &statement, null));
@@ -335,17 +349,10 @@ pub const WatershedStack = struct {
             const envelopeSize = gpkg.envelopeSize(header);
             if (envelopeSize != 0) {
                 const envelope: *const gpkg.EnvelopeXY = @alignCast(@ptrCast(shapeBlob + gpkg.headerSize));
-                // std.log.debug("pointX = {d}", .{pointX});
-                // std.log.debug("pointY = {d}", .{pointY});
-                // std.log.debug("minx = {d}", .{envelope.minx});
-                // std.log.debug("maxx = {d}", .{envelope.maxx});
-                // std.log.debug("miny = {d}", .{envelope.miny});
-                // std.log.debug("maxy = {d}", .{envelope.maxy});
                 if (envelope.minx > pointX) continue;
                 if (envelope.maxx < pointX) continue;
                 if (envelope.miny > pointY) continue;
                 if (envelope.maxy < pointY) continue;
-                // std.log.debug("Point within bounding box", .{});
             }
 
             var shape = geos_c.GEOSWKBReader_read_r(self.gctx.handle, reader, shapeBlob + gpkg.headerSize + envelopeSize, shapeSize);
@@ -363,7 +370,7 @@ pub const WatershedStack = struct {
         }
 
         // Once we've found the point assign the huc and name.
-        var newHuc = [12]u8{ ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' };
+        var newHuc = [16]u8{ ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' };
         const hucSpan = std.mem.span(sqlite.sqlite3_column_text(statement, 0));
         @memcpy(newHuc[0..hucSpan.len], hucSpan);
 
