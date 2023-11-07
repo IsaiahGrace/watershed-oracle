@@ -322,8 +322,8 @@ pub const WatershedStack = struct {
         }
     }
 
-    fn search(self: *WatershedStack, hucLevel: []const u8, tableName: []const u8, likePattern: []const u8) !Watershed {
-        const queryString = try std.fmt.allocPrintZ(self.allocator, "SELECT {s},name,shape FROM \"{s}\" WHERE \"{s}\" LIKE '{s}%';", .{ hucLevel, tableName, hucLevel, likePattern });
+    fn search(self: *WatershedStack, hucLevel: []const u8, tableName: [*:0]const u8, likePattern: []const u8) !Watershed {
+        const queryString = try std.fmt.allocPrintZ(self.allocator, "SELECT rowid,{s},name FROM \"{s}\" WHERE \"{s}\" LIKE '{s}%';", .{ hucLevel, tableName, hucLevel, likePattern });
         defer self.allocator.free(queryString);
 
         var statement: ?*sqlite.sqlite3_stmt = null;
@@ -350,28 +350,29 @@ pub const WatershedStack = struct {
             const stepResult = try sqliteErrors.stepCheck(sqlite.sqlite3_step(statement));
             if (stepResult == sqlite.SQLITE_DONE) return error.pointNotInDataset;
 
-            // Get the geometry data and do a check against the point.
-            const shapeBlob: [*]const u8 = @ptrCast(sqlite.sqlite3_column_blob(statement, 2).?);
-            const shapeSize: usize = @intCast(sqlite.sqlite3_column_bytes(statement, 2));
+            std.log.debug("huc: {s} - {s}", .{
+                std.mem.span(sqlite.sqlite3_column_text(statement, 1)),
+                std.mem.span(sqlite.sqlite3_column_text(statement, 2)),
+            });
 
-            std.log.debug("huc: {s} - {s}", .{ std.mem.span(sqlite.sqlite3_column_text(statement, 0)), std.mem.span(sqlite.sqlite3_column_text(statement, 1)) });
+            const rowid = sqlite.sqlite3_column_int64(statement, 0);
+            var blob: ?*sqlite.sqlite3_blob = null;
+            try sqliteErrors.check(sqlite.sqlite3_blob_open(self.sctx.conn, "main", tableName, "shape", rowid, 0, &blob));
+            defer sqliteErrors.log(sqlite.sqlite3_blob_close(blob));
 
-            const header: *const gpkg.Header = @alignCast(@ptrCast(shapeBlob));
-            const envelopeSize = gpkg.envelopeSize(header);
-            if (envelopeSize != 0) {
-                const envelope: *const gpkg.EnvelopeXY = @alignCast(@ptrCast(shapeBlob + gpkg.headerSize));
-                if (envelope.minx > pmaxX) continue;
-                if (envelope.maxx < pminX) continue;
-                if (envelope.miny > pmaxY) continue;
-                if (envelope.maxy < pminY) continue;
+            var header: gpkg.HeaderAndEnvelopeXY = undefined;
+            try sqliteErrors.check(sqlite.sqlite3_blob_read(blob, &header, @sizeOf(@TypeOf(header)), 0));
+
+            if ((header.envelopeXY.minx > pmaxX) or (header.envelopeXY.maxx < pminX) or (header.envelopeXY.miny > pmaxY) or (header.envelopeXY.maxy < pminY)) {
+                continue;
             }
 
-            newGeom = geos_c.GEOSWKBReader_read_r(
-                self.gctx.handle,
-                reader,
-                shapeBlob + gpkg.headerSize + envelopeSize,
-                shapeSize - gpkg.headerSize - envelopeSize,
-            );
+            const blobSize: usize = @intCast(sqlite.sqlite3_blob_bytes(blob));
+            const shapeBuffer: []u8 = try self.allocator.alloc(u8, blobSize - @sizeOf(@TypeOf(header)));
+            defer self.allocator.free(shapeBuffer);
+            try sqliteErrors.check(sqlite.sqlite3_blob_read(blob, shapeBuffer.ptr, @intCast(shapeBuffer.len), @sizeOf(@TypeOf(header))));
+
+            newGeom = geos_c.GEOSWKBReader_read_r(self.gctx.handle, reader, shapeBuffer.ptr, shapeBuffer.len);
             if (newGeom == null) return error.ReaderParseError;
 
             // if it does cover us, break!
@@ -387,10 +388,10 @@ pub const WatershedStack = struct {
 
         // Once we've found the point assign the huc and name.
         var newHuc = [16]u8{ ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' };
-        const hucSpan = std.mem.span(sqlite.sqlite3_column_text(statement, 0));
+        const hucSpan = std.mem.span(sqlite.sqlite3_column_text(statement, 1));
         @memcpy(newHuc[0..hucSpan.len], hucSpan);
 
-        const nameSpan = std.mem.span(sqlite.sqlite3_column_text(statement, 1));
+        const nameSpan = std.mem.span(sqlite.sqlite3_column_text(statement, 2));
         var newName = try self.allocator.alloc(u8, nameSpan.len);
         errdefer self.allocator.free(newName);
         @memcpy(newName, nameSpan);
