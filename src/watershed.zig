@@ -107,7 +107,7 @@ pub const WatershedStack = struct {
             defer geos_c.GEOSWKTWriter_destroy_r(self.gctx.handle, writer);
 
             const pointWKT = geos_c.GEOSWKTWriter_write_r(self.gctx.handle, writer, point);
-            defer geos_c.GEOSFree(pointWKT);
+            defer geos_c.GEOSFree_r(self.gctx.handle, pointWKT);
 
             try stdout.print("Point of interest: {s}\n", .{pointWKT});
         } else {
@@ -381,7 +381,7 @@ pub const WatershedStack = struct {
                 break;
             } else {
                 std.log.debug("Compared Geometry - Point outside watershed.", .{});
-                geos_c.GEOSGeom_destroy(newGeom);
+                geos_c.GEOSGeom_destroy_r(self.gctx.handle, newGeom);
                 newGeom = null;
             }
         }
