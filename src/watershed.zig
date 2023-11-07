@@ -97,7 +97,11 @@ pub const WatershedStack = struct {
         self.sctx.deinit();
     }
 
-    pub fn logPoint(self: *const WatershedStack) void {
+    pub fn logPoint(self: *const WatershedStack) !void {
+        const stdout_file = std.io.getStdOut().writer();
+        var bw = std.io.bufferedWriter(stdout_file);
+        const stdout = bw.writer();
+
         if (self.point) |point| {
             var writer = geos_c.GEOSWKTWriter_create_r(self.gctx.handle);
             defer geos_c.GEOSWKTWriter_destroy_r(self.gctx.handle, writer);
@@ -105,22 +109,28 @@ pub const WatershedStack = struct {
             const pointWKT = geos_c.GEOSWKTWriter_write_r(self.gctx.handle, writer, point);
             defer geos_c.GEOSFree(pointWKT);
 
-            std.log.info("Point of interest: {s}", .{pointWKT});
+            try stdout.print("Point of interest: {s}\n", .{pointWKT});
         } else {
-            std.log.info("Point of interest not set.", .{});
+            try stdout.print("Point of interest not set.\n", .{});
         }
+        try bw.flush();
     }
 
-    pub fn logStack(self: *const WatershedStack) void {
-        std.log.info("Watershed stack:", .{});
-        if (self.huc2) |watershed| std.log.info("{s} : {s}", .{ watershed.huc, watershed.name });
-        if (self.huc4) |watershed| std.log.info("{s} : {s}", .{ watershed.huc, watershed.name });
-        if (self.huc6) |watershed| std.log.info("{s} : {s}", .{ watershed.huc, watershed.name });
-        if (self.huc8) |watershed| std.log.info("{s} : {s}", .{ watershed.huc, watershed.name });
-        if (self.huc10) |watershed| std.log.info("{s} : {s}", .{ watershed.huc, watershed.name });
-        if (self.huc12) |watershed| std.log.info("{s} : {s}", .{ watershed.huc, watershed.name });
-        if (self.huc14) |watershed| std.log.info("{s} : {s}", .{ watershed.huc, watershed.name });
-        if (self.huc16) |watershed| std.log.info("{s} : {s}", .{ watershed.huc, watershed.name });
+    pub fn logStack(self: *const WatershedStack) !void {
+        const stdout_file = std.io.getStdOut().writer();
+        var bw = std.io.bufferedWriter(stdout_file);
+        const stdout = bw.writer();
+
+        try stdout.print("Watershed stack:\n", .{});
+        if (self.huc2) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
+        if (self.huc4) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
+        if (self.huc6) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
+        if (self.huc8) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
+        if (self.huc10) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
+        if (self.huc12) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
+        if (self.huc14) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
+        if (self.huc16) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
+        try bw.flush();
     }
 
     fn clearPoint(self: *WatershedStack) void {
@@ -138,8 +148,6 @@ pub const WatershedStack = struct {
 
         self.point = geos_c.GEOSWKTReader_read_r(self.gctx.handle, reader, newPoint);
         if (self.point == null) return error.updateWKT;
-
-        self.logPoint();
         try self.update();
     }
 
@@ -147,8 +155,6 @@ pub const WatershedStack = struct {
         self.clearPoint();
         self.point = geos_c.GEOSGeom_createPointFromXY_r(self.gctx.handle, x, y);
         if (self.point == null) return error.updateXY;
-
-        self.logPoint();
         try self.update();
     }
 
@@ -330,10 +336,15 @@ pub const WatershedStack = struct {
         defer geos_c.GEOSWKBReader_destroy_r(self.gctx.handle, reader);
 
         // We'll use these to compare against the bounding boxes
-        var pointX: f64 = undefined;
-        var pointY: f64 = undefined;
-        _ = geos_c.GEOSGeom_getXMin_r(self.gctx.handle, self.point, &pointX);
-        _ = geos_c.GEOSGeom_getYMin_r(self.gctx.handle, self.point, &pointY);
+        var pminX: f64 = undefined;
+        var pmaxX: f64 = undefined;
+        var pminY: f64 = undefined;
+        var pmaxY: f64 = undefined;
+        // GEOS will return zero if there was an exception getting the min/max.
+        if (geos_c.GEOSGeom_getXMin_r(self.gctx.handle, self.point, &pminX) == 0) pminX = std.math.floatMax(f64);
+        if (geos_c.GEOSGeom_getXMax_r(self.gctx.handle, self.point, &pmaxX) == 0) pmaxX = std.math.floatMin(f64);
+        if (geos_c.GEOSGeom_getYMin_r(self.gctx.handle, self.point, &pminY) == 0) pminY = std.math.floatMax(f64);
+        if (geos_c.GEOSGeom_getYMax_r(self.gctx.handle, self.point, &pmaxY) == 0) pmaxY = std.math.floatMin(f64);
 
         while (true) {
             const stepResult = try sqliteErrors.stepCheck(sqlite.sqlite3_step(statement));
@@ -349,10 +360,10 @@ pub const WatershedStack = struct {
             const envelopeSize = gpkg.envelopeSize(header);
             if (envelopeSize != 0) {
                 const envelope: *const gpkg.EnvelopeXY = @alignCast(@ptrCast(shapeBlob + gpkg.headerSize));
-                if (envelope.minx > pointX) continue;
-                if (envelope.maxx < pointX) continue;
-                if (envelope.miny > pointY) continue;
-                if (envelope.maxy < pointY) continue;
+                if (envelope.minx > pmaxX) continue;
+                if (envelope.maxx < pminX) continue;
+                if (envelope.miny > pmaxY) continue;
+                if (envelope.maxy < pminY) continue;
             }
 
             var shape = geos_c.GEOSWKBReader_read_r(self.gctx.handle, reader, shapeBlob + gpkg.headerSize + envelopeSize, shapeSize);

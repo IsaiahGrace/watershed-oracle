@@ -14,10 +14,14 @@ pub fn main() !void {
     defer watershedStack.deinit();
 
     try watershedStack.updateWKT("POINT(-77.9510 39.7624)");
-    watershedStack.logPoint();
-    watershedStack.logStack();
+    try watershedStack.logPoint();
+    try watershedStack.logStack();
 
     try watershedStack.updateXY(-77.047819, 38.927751);
-    watershedStack.logPoint();
-    watershedStack.logStack();
+    try watershedStack.logPoint();
+    try watershedStack.logStack();
+
+    try watershedStack.updateXY(-77.0369476121013, 38.93417495243022);
+    try watershedStack.logPoint();
+    try watershedStack.logStack();
 }
