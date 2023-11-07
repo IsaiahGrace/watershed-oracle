@@ -366,17 +366,22 @@ pub const WatershedStack = struct {
                 if (envelope.maxy < pminY) continue;
             }
 
-            var shape = geos_c.GEOSWKBReader_read_r(self.gctx.handle, reader, shapeBlob + gpkg.headerSize + envelopeSize, shapeSize);
-            if (shape == null) return error.ReaderParseError;
+            newGeom = geos_c.GEOSWKBReader_read_r(
+                self.gctx.handle,
+                reader,
+                shapeBlob + gpkg.headerSize + envelopeSize,
+                shapeSize - gpkg.headerSize - envelopeSize,
+            );
+            if (newGeom == null) return error.ReaderParseError;
 
             // if it does cover us, break!
-            if (geos_c.GEOSCovers_r(self.gctx.handle, shape, self.point) == 1) {
-                newGeom = shape;
+            if (geos_c.GEOSCovers_r(self.gctx.handle, newGeom, self.point) == 1) {
                 std.log.debug("Compared Geometry - Point within watershed!", .{});
                 break;
             } else {
                 std.log.debug("Compared Geometry - Point outside watershed.", .{});
-                geos_c.GEOSGeom_destroy(shape);
+                geos_c.GEOSGeom_destroy(newGeom);
+                newGeom = null;
             }
         }
 
@@ -390,12 +395,10 @@ pub const WatershedStack = struct {
         errdefer self.allocator.free(newName);
         @memcpy(newName, nameSpan);
 
-        var newWatershed = Watershed{
+        return Watershed{
             .huc = newHuc,
             .name = newName,
             .geom = newGeom.?,
         };
-
-        return newWatershed;
     }
 };

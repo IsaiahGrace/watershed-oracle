@@ -53,7 +53,6 @@ pub fn check(err: c_int) SqliteError!void {
         .SQLITE_ROW => return, // This is a non-error return code
         .SQLITE_DONE => return, // This is a non-error return code
     }
-    return error.UnknownSQLiteError;
 }
 
 const SqliteError = error{
