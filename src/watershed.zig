@@ -17,6 +17,10 @@ pub const WatershedStack = struct {
     sctx: SqliteCtx,
     gctx: GeosCtx,
 
+    // HUC levels 14 and 16 are not defined for most of the country, and the SQL lookup for
+    // these levels is almost always a waste of time. This switch just skips these two levels.
+    skipHuc14and16: bool,
+
     point: geos_c.GEOSGeom,
 
     huc2: ?Watershed,
@@ -28,8 +32,14 @@ pub const WatershedStack = struct {
     huc14: ?Watershed,
     huc16: ?Watershed,
 
-    pub fn init(allocator: std.mem.Allocator, gpkgPath: [*:0]const u8) !WatershedStack {
-        const sqliteContext = try SqliteCtx.init(gpkgPath);
+    pub fn init(allocator: std.mem.Allocator, gpkgPath: []const u8, skipHuc14and16: bool) !WatershedStack {
+        // We need to provide a null terminated path to SqliteCtx.init(), so we'll have to add that null byte here
+        var pathBuffer = try std.ArrayList(u8).initCapacity(allocator, gpkgPath.len + 1);
+        defer pathBuffer.deinit();
+        try pathBuffer.appendSlice(gpkgPath);
+        try pathBuffer.append(0);
+
+        const sqliteContext = try SqliteCtx.init(@ptrCast(pathBuffer.items));
         errdefer sqliteContext.deinit();
 
         const geosContext = GeosCtx.init();
@@ -39,6 +49,7 @@ pub const WatershedStack = struct {
             .allocator = allocator,
             .sctx = sqliteContext,
             .gctx = geosContext,
+            .skipHuc14and16 = skipHuc14and16,
             .point = null,
             .huc2 = null,
             .huc4 = null,
@@ -161,7 +172,11 @@ pub const WatershedStack = struct {
     fn update(self: *WatershedStack) !void {
         // The point has been updated, now re-validate the watershed stack.
         if (self.point == null) return error.updateNullPoint;
-        try self.checkHUC16();
+        if (self.skipHuc14and16) {
+            try self.checkHUC12();
+        } else {
+            try self.checkHUC16();
+        }
     }
 
     // All check and update functions assume that self.point is not null
@@ -303,6 +318,7 @@ pub const WatershedStack = struct {
     }
 
     fn updateHUC14(self: *WatershedStack) !void {
+        if (self.skipHuc14and16) return;
         std.log.debug("{s}", .{@src().fn_name});
         if (self.huc12) |huc12| {
             self.huc14 = self.search("huc14", "WBDHU14", huc12.huc[0..12]) catch |err| {
@@ -316,6 +332,7 @@ pub const WatershedStack = struct {
     }
 
     fn updateHUC16(self: *WatershedStack) !void {
+        if (self.skipHuc14and16) return;
         std.log.debug("{s}", .{@src().fn_name});
         if (self.huc14) |huc14| {
             self.huc16 = try self.search("huc16", "WBDHU16", huc14.huc[0..14]);

@@ -1,41 +1,66 @@
+const clap = @import("clap");
 const sqlite = @cImport(@cInclude("sqlite3.h"));
-
 const std = @import("std");
 const watershed = @import("watershed.zig");
 
 pub fn main() !void {
-    if (std.os.argv.len < 2) {
-        std.log.err("Provide full path to WBD_National_GPKG.gpkg", .{});
-        std.log.err("NOTE: sqlite3 does not support ~/", .{});
-        std.log.err("Try:", .{});
-        std.log.err("zig build run -- /home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg", .{});
-        return error.NoArgs;
+    const params = comptime clap.parseParamsComptime(
+        \\-h, --help             Display this help and exit.
+        \\-d, --databse <str>    Required. The full path to WBD_National_GPKG.gpkg. This path is given directly to sqlite3_open() and does not support the home directory shortcut '~/'.
+        \\-s, --skipHuc14and16   Disables searching in HUC levels 14 and 16. These levels are not defined for most of the US. Defaults to false.
+    );
+
+    var diag = clap.Diagnostic{};
+    var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
+        .diagnostic = &diag,
+    }) catch |err| {
+        diag.report(std.io.getStdErr().writer(), err) catch {};
+        return err;
+    };
+    defer res.deinit();
+
+    if (res.args.help != 0 or res.args.databse == null) {
+        const stderr = std.io.getStdErr().writer();
+        try stderr.print("The WatershedOracleCLI program reads WKT point data line by line from stdin and prints watershed data to stdout.\n", .{});
+        try stderr.print("The intended use is to pipe WKT point data into this program from another process like cat, or a GPS tracker.\n\n", .{});
+        try stderr.print("Usage:\n", .{});
+        try clap.help(stderr, clap.Help, &params, .{});
+        try stderr.print("\nExamples:\n", .{});
+        try stderr.print("echo \"POINT(-70.386781360 43.5014404586)\" | ./watershedOracleCLI --databse=/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg\n", .{});
+        try stderr.print("cat gps_data_file | ./watershedOracleCLI --databse=/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg\n\n", .{});
+        return;
     }
+
+    const skipHuc14and16 = if (res.args.skipHuc14and16 != 0) true else false;
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa.deinit() == .leak) std.log.err("GPA detected a leak!", .{});
     const allocator: std.mem.Allocator = gpa.allocator();
 
-    var watershedStack = try watershed.WatershedStack.init(allocator, std.os.argv[1]);
+    var watershedStack = try watershed.WatershedStack.init(allocator, res.args.databse.?, skipHuc14and16);
     defer watershedStack.deinit();
 
-    // In PA, near Hagerstown
-    try watershedStack.updateWKT("POINT(-77.9510 39.7624)");
-    try watershedStack.logPoint();
-    try watershedStack.logStack();
+    const stdin = std.io.getStdIn().reader();
 
-    // In the national zoo, DC
-    try watershedStack.updateXY(-77.047819, 38.927751);
-    try watershedStack.logPoint();
-    try watershedStack.logStack();
+    var stdinBuffer = std.ArrayList(u8).init(allocator);
+    defer stdinBuffer.deinit();
 
-    // My apartment building
-    try watershedStack.updateXY(-77.0369476121013, 38.93417495243022);
-    try watershedStack.logPoint();
-    try watershedStack.logStack();
+    while (true) {
+        stdin.streamUntilDelimiter(stdinBuffer.writer(), '\n', null) catch |e| {
+            switch (e) {
+                error.EndOfStream => break,
+                else => return e,
+            }
+        };
 
-    // Ocean Park, ME
-    try watershedStack.updateXY(-70.38678136034306, 43.501440458688094);
-    try watershedStack.logPoint();
-    try watershedStack.logStack();
+        // The WKT reader expects a null terminated string, so we need to add that null byte
+        try stdinBuffer.append(0);
+
+        // The @ptrCast() is hacky, but I'm not sure what the "correct" thing to do here is..
+        try watershedStack.updateWKT(@ptrCast(stdinBuffer.items));
+        try watershedStack.logPoint();
+        try watershedStack.logStack();
+
+        stdinBuffer.clearRetainingCapacity();
+    }
 }

@@ -15,6 +15,12 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    // This "clap" refers to the .clap field in the build.zig.zon file
+    const clap = b.dependency("clap", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     // The CLI app takes a point from stdin, and prints the watershed data to stdout.
     // Used to develop and debug the system.
     const cli = b.addExecutable(.{
@@ -23,6 +29,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    // The first "clap" refers to build.zig.zon, the second "clap" refers to the b.addModule("clap", ...) call in the zig-clap build.zig file.
+    cli.addModule("clap", clap.module("clap"));
     cli.linkLibC();
     cli.linkSystemLibrary("geos_c");
     cli.linkSystemLibrary("sqlite3");

@@ -1,6 +1,6 @@
 const cli = @import("cli.zig");
-const geoCache = @import("geoCache.zig");
 const geosCtx = @import("geosCtx.zig");
+const gpkg = @import("gpkg.zig");
 const server = @import("server.zig");
 const sqliteCtx = @import("sqliteCtx.zig");
 const sqliteErrors = @import("sqliteErrors.zig");
@@ -12,8 +12,8 @@ const watershed = @import("watershed.zig");
 
 test {
     _ = cli;
-    _ = geoCache;
     _ = geosCtx;
+    _ = gpkg;
     _ = server;
     _ = sqliteCtx;
     _ = sqliteErrors;

@@ -1,6 +1,6 @@
-const std = @import("std");
 const sqlite = @cImport(@cInclude("sqlite3.h"));
 const sqliteErrors = @import("sqliteErrors.zig");
+const std = @import("std");
 
 // This struct is a helper abstraction on the SQLite3 DB for the USGS Watershed Boundary Dataset (WBD)
 // The dataset is available for download here: https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Hydrography/WBD/National/GPKG/
