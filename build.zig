@@ -64,6 +64,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    unit_tests.addModule("clap", clap.module("clap"));
     unit_tests.linkLibC();
     unit_tests.linkSystemLibrary("geos_c");
     unit_tests.linkSystemLibrary("sqlite3");

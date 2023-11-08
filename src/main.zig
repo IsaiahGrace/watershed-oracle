@@ -33,6 +33,8 @@ pub fn main() !void {
 
     const skipHuc14and16 = if (res.args.skipHuc14and16 != 0) true else false;
 
+    // Done parsing arguments, lets get to the program!
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa.deinit() == .leak) std.log.err("GPA detected a leak!", .{});
     const allocator: std.mem.Allocator = gpa.allocator();
@@ -45,6 +47,7 @@ pub fn main() !void {
     var stdinBuffer = std.ArrayList(u8).init(allocator);
     defer stdinBuffer.deinit();
 
+    // Read from stdin until there's nothing more to read.
     while (true) {
         stdin.streamUntilDelimiter(stdinBuffer.writer(), '\n', null) catch |e| {
             switch (e) {
@@ -63,4 +66,8 @@ pub fn main() !void {
 
         stdinBuffer.clearRetainingCapacity();
     }
+}
+
+test "main" {
+    std.testing.refAllDecls(@This());
 }
