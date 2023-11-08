@@ -21,49 +21,23 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // The CLI app takes a point from stdin, and prints the watershed data to stdout.
-    // Used to develop and debug the system.
-    const cli = b.addExecutable(.{
-        .name = "watershedOracleCLI",
-        .root_source_file = .{ .path = "src/cli.zig" },
+    const exe = b.addExecutable(.{
+        .name = "watershedOracle",
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
     // The first "clap" refers to build.zig.zon, the second "clap" refers to the b.addModule("clap", ...) call in the zig-clap build.zig file.
-    cli.addModule("clap", clap.module("clap"));
-    cli.linkLibC();
-    cli.linkSystemLibrary("geos_c");
-    cli.linkSystemLibrary("sqlite3");
-    b.installArtifact(cli);
-
-    // The Telegram Bot takes a location data from a telegram chat and replies with the watershed data
-    const bot = b.addExecutable(.{
-        .name = "watershedOracleTelegramBot",
-        .root_source_file = .{ .path = "src/telegramBot.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    bot.linkLibC();
-    bot.linkSystemLibrary("geos_c");
-    bot.linkSystemLibrary("sqlite3");
-    b.installArtifact(bot);
-
-    // The Server executable is long-running and tracks the watershed of a single point as it moves over time.
-    const server = b.addExecutable(.{
-        .name = "watershedOracleServer",
-        .root_source_file = .{ .path = "src/server.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    server.linkLibC();
-    server.linkSystemLibrary("geos_c");
-    server.linkSystemLibrary("sqlite3");
-    b.installArtifact(server);
+    exe.addModule("clap", clap.module("clap"));
+    exe.linkLibC();
+    exe.linkSystemLibrary("geos_c");
+    exe.linkSystemLibrary("sqlite3");
+    b.installArtifact(exe);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
     // such a dependency.
-    const run_cmd = b.addRunArtifact(cli);
+    const run_cmd = b.addRunArtifact(exe);
 
     // By making the run step depend on the install step, it will be run from the
     // installation directory rather than directly from within the cache directory.
@@ -86,7 +60,7 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/test.zig" },
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
