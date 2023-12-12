@@ -3,7 +3,7 @@ const std = @import("std");
 const stdio = @cImport(@cInclude("stdio.h"));
 
 pub const GeosCtx = struct {
-    handle: geos_c.GEOSContextHandle_t,
+    handle: geos_c.GEOSContextHandle_t, // Opaque pointer to the geos context
 
     pub fn init() GeosCtx {
         const newHandle = geos_c.GEOS_init_r();
