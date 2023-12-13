@@ -22,7 +22,7 @@ pub fn main() !void {
     defer res.deinit();
 
     if (res.args.testRaylib != 0) {
-        display.drawShapes();
+        display.raylibTest();
         return;
     }
 
