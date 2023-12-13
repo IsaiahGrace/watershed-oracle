@@ -172,11 +172,27 @@ pub const WatershedStack = struct {
     fn update(self: *WatershedStack) !void {
         // The point has been updated, now re-validate the watershed stack.
         if (self.point == null) return error.updateNullPoint;
-        if (self.skipHuc14and16) {
-            try self.checkHUC12();
-        } else {
-            try self.checkHUC16();
+
+        const err = if (self.skipHuc14and16)
+            self.checkHUC12()
+        else
+            self.checkHUC16();
+
+        if (err) {} else |e| {
+            switch (e) {
+                error.pointNotInDataset => {
+                    const writer = geos_c.GEOSWKTWriter_create_r(self.gctx.handle);
+                    defer geos_c.GEOSWKTWriter_destroy_r(self.gctx.handle, writer);
+
+                    const wkt = geos_c.GEOSWKTWriter_write_r(self.gctx.handle, writer, self.point);
+                    defer geos_c.GEOSFree_r(self.gctx.handle, wkt);
+
+                    std.log.err("Point given is outside the dataset: {s}", .{wkt});
+                },
+                else => {},
+            }
         }
+        return err;
     }
 
     // All check and update functions assume that self.point is not null
