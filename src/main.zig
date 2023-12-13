@@ -2,12 +2,14 @@ const clap = @import("clap");
 const sqlite = @cImport(@cInclude("sqlite3.h"));
 const std = @import("std");
 const watershed = @import("watershed.zig");
+const display = @import("display.zig");
 
 pub fn main() !void {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help             Display this help and exit.
         \\-d, --database <str>   Required. The full path to WBD_National_GPKG.gpkg. This path is given directly to sqlite3_open() and does not support the home directory shortcut '~/'.
         \\-s, --skipHuc14and16   Disables searching in HUC levels 14 and 16. These levels are not defined for most of the US. Defaults to false.
+        \\-t, --testRaylib       Run a simple hello world raylib demo and exit.
     );
 
     var diag = clap.Diagnostic{};
@@ -18,6 +20,11 @@ pub fn main() !void {
         return err;
     };
     defer res.deinit();
+
+    if (res.args.testRaylib != 0) {
+        display.drawShapes();
+        return;
+    }
 
     if (res.args.help != 0 or res.args.database == null) {
         const stderr = std.io.getStdErr().writer();

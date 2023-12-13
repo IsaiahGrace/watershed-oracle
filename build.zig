@@ -1,4 +1,5 @@
 const std = @import("std");
+const raylib = @import("lib/raylib/build.zig");
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -14,6 +15,19 @@ pub fn build(b: *std.Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
+
+    // From lib/raylib/build.zig
+    const raylibOptions = raylib.Options{
+        .platform_drm = b.option(bool, "platform_drm", "Compile raylib in native mode (no X11)") orelse false,
+        .raudio = false,
+        .rmodels = false,
+        .rtext = true,
+        .rtextures = true,
+        .rshapes = true,
+        .raygui = false,
+    };
+    const rlib = raylib.addRaylib(b, target, optimize, raylibOptions);
+    b.installArtifact(rlib);
 
     // This "clap" refers to the .clap field in the build.zig.zon file
     const clap = b.dependency("clap", .{
@@ -32,6 +46,8 @@ pub fn build(b: *std.Build) void {
     exe.linkLibC();
     exe.linkSystemLibrary("geos_c");
     exe.linkSystemLibrary("sqlite3");
+    exe.addIncludePath(.{ .path = "lib/raylib" });
+    exe.linkLibrary(rlib);
     b.installArtifact(exe);
 
     // This *creates* a Run step in the build graph, to be executed when another
