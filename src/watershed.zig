@@ -6,7 +6,7 @@ const SqliteCtx = @import("sqliteCtx.zig").SqliteCtx;
 const sqliteErrors = @import("sqliteErrors.zig");
 const std = @import("std");
 
-const Watershed = struct {
+pub const Watershed = struct {
     huc: [16]u8,
     name: []const u8,
     geom: *geos_c.GEOSGeometry,

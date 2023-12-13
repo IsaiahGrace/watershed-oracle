@@ -9,7 +9,6 @@ pub fn main() !void {
         \\-h, --help             Display this help and exit.
         \\-d, --database <str>   Required. The full path to WBD_National_GPKG.gpkg. This path is given directly to sqlite3_open() and does not support the home directory shortcut '~/'.
         \\-s, --skipHuc14and16   Disables searching in HUC levels 14 and 16. These levels are not defined for most of the US. Defaults to false.
-        \\-t, --testRaylib       Run a simple hello world raylib demo and exit.
     );
 
     var diag = clap.Diagnostic{};
@@ -20,11 +19,6 @@ pub fn main() !void {
         return err;
     };
     defer res.deinit();
-
-    if (res.args.testRaylib != 0) {
-        display.raylibTest();
-        return;
-    }
 
     if (res.args.help != 0 or res.args.database == null) {
         const stderr = std.io.getStdErr().writer();
@@ -54,6 +48,9 @@ pub fn main() !void {
     var stdinBuffer = std.ArrayList(u8).init(allocator);
     defer stdinBuffer.deinit();
 
+    var dsp = display.Display.init(allocator);
+    dsp.drawSplash();
+
     // Read from stdin until there's nothing more to read.
     while (true) {
         stdin.streamUntilDelimiter(stdinBuffer.writer(), '\n', null) catch |e| {
@@ -71,8 +68,13 @@ pub fn main() !void {
         try watershedStack.logPoint();
         try watershedStack.logStack();
 
+        try dsp.drawWatershedStack(&watershedStack);
+
         stdinBuffer.clearRetainingCapacity();
     }
+
+    std.time.sleep(10 * std.time.ns_per_s);
+    dsp.deinit();
 }
 
 test "main" {
