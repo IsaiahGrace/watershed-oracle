@@ -5,6 +5,7 @@ const sqlite = @cImport(@cInclude("sqlite3.h"));
 const SqliteCtx = @import("sqliteCtx.zig").SqliteCtx;
 const sqliteErrors = @import("sqliteErrors.zig");
 const std = @import("std");
+const display = @import("display.zig");
 
 pub const Watershed = struct {
     huc: [16]u8,
@@ -16,6 +17,7 @@ pub const WatershedStack = struct {
     allocator: std.mem.Allocator,
     sctx: SqliteCtx,
     gctx: GeosCtx,
+    dsp: *display.Display,
 
     // HUC levels 14 and 16 are not defined for most of the country, and the SQL lookup for
     // these levels is almost always a waste of time. This switch just skips these two levels.
@@ -32,7 +34,7 @@ pub const WatershedStack = struct {
     huc14: ?Watershed,
     huc16: ?Watershed,
 
-    pub fn init(allocator: std.mem.Allocator, gpkgPath: []const u8, skipHuc14and16: bool) !WatershedStack {
+    pub fn init(allocator: std.mem.Allocator, dsp: *display.Display, gpkgPath: []const u8, skipHuc14and16: bool) !WatershedStack {
         // We need to provide a null terminated path to SqliteCtx.init(), so we'll have to add that null byte here
         var pathBuffer = try std.ArrayList(u8).initCapacity(allocator, gpkgPath.len + 1);
         defer pathBuffer.deinit();
@@ -49,6 +51,7 @@ pub const WatershedStack = struct {
             .allocator = allocator,
             .sctx = sqliteContext,
             .gctx = geosContext,
+            .dsp = dsp,
             .skipHuc14and16 = skipHuc14and16,
             .point = null,
             .huc2 = null,
@@ -290,6 +293,7 @@ pub const WatershedStack = struct {
     fn updateHUC2(self: *WatershedStack) !void {
         std.log.debug("{s}", .{@src().fn_name});
         self.huc2 = try self.search("huc2", "WBDHU2", "");
+        try self.dsp.drawWatershedStack(self);
         return self.updateHUC4();
     }
 
@@ -297,6 +301,7 @@ pub const WatershedStack = struct {
         std.log.debug("{s}", .{@src().fn_name});
         if (self.huc2) |huc2| {
             self.huc4 = try self.search("huc4", "WBDHU4", huc2.huc[0..2]);
+            try self.dsp.drawWatershedStack(self);
             return self.updateHUC6();
         }
     }
@@ -305,6 +310,7 @@ pub const WatershedStack = struct {
         std.log.debug("{s}", .{@src().fn_name});
         if (self.huc4) |huc4| {
             self.huc6 = try self.search("huc6", "WBDHU6", huc4.huc[0..4]);
+            try self.dsp.drawWatershedStack(self);
             return self.updateHUC8();
         }
     }
@@ -313,6 +319,7 @@ pub const WatershedStack = struct {
         std.log.debug("{s}", .{@src().fn_name});
         if (self.huc6) |huc6| {
             self.huc8 = try self.search("huc8", "WBDHU8", huc6.huc[0..6]);
+            try self.dsp.drawWatershedStack(self);
             return self.updateHUC10();
         }
     }
@@ -321,6 +328,7 @@ pub const WatershedStack = struct {
         std.log.debug("{s}", .{@src().fn_name});
         if (self.huc8) |huc8| {
             self.huc10 = try self.search("huc10", "WBDHU10", huc8.huc[0..8]);
+            try self.dsp.drawWatershedStack(self);
             return self.updateHUC12();
         }
     }
@@ -329,6 +337,7 @@ pub const WatershedStack = struct {
         std.log.debug("{s}", .{@src().fn_name});
         if (self.huc10) |huc10| {
             self.huc12 = try self.search("huc12", "WBDHU12", huc10.huc[0..10]);
+            try self.dsp.drawWatershedStack(self);
             return self.updateHUC14();
         }
     }
@@ -343,6 +352,7 @@ pub const WatershedStack = struct {
                     else => return err,
                 }
             };
+            try self.dsp.drawWatershedStack(self);
             return self.updateHUC16();
         }
     }
@@ -352,6 +362,7 @@ pub const WatershedStack = struct {
         std.log.debug("{s}", .{@src().fn_name});
         if (self.huc14) |huc14| {
             self.huc16 = try self.search("huc16", "WBDHU16", huc14.huc[0..14]);
+            try self.dsp.drawWatershedStack(self);
         }
     }
 

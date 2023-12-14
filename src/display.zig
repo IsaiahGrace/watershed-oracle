@@ -11,9 +11,6 @@ pub const Display = struct {
 
     pub fn init(allocator: std.mem.Allocator) Display {
         raylib.InitWindow(screenWidth, screenHeight, "Beepy LCD display");
-        if (config.beepyMode) {
-            raylib.SetTargetFPS(5);
-        }
         return Display{
             .textBuffer = std.ArrayList(u8).init(allocator),
         };
@@ -30,6 +27,7 @@ pub const Display = struct {
         raylib.ClearBackground(raylib.RAYWHITE);
         raylib.DrawText("Watershed Oracle", 20, 100, 40, raylib.BLACK);
         raylib.EndDrawing();
+        raylib.SwapScreenBuffer();
     }
 
     fn drawWatershed(self: *Display, wshed: watershed.Watershed, posY: c_int) !void {
@@ -59,5 +57,6 @@ pub const Display = struct {
         if (watershedStack.huc12) |w| try self.drawWatershed(w, 190);
 
         raylib.EndDrawing();
+        raylib.SwapScreenBuffer();
     }
 };

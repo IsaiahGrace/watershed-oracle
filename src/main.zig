@@ -40,18 +40,17 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) std.log.err("GPA detected a leak!", .{});
     const allocator: std.mem.Allocator = gpa.allocator();
 
-    var watershedStack = try watershed.WatershedStack.init(allocator, res.args.database.?, skipHuc14and16);
+    var dsp = display.Display.init(allocator);
+    defer dsp.deinit();
+    dsp.drawSplash();
+
+    var watershedStack = try watershed.WatershedStack.init(allocator, &dsp, res.args.database.?, skipHuc14and16);
     defer watershedStack.deinit();
 
     const stdin = std.io.getStdIn().reader();
 
     var stdinBuffer = std.ArrayList(u8).init(allocator);
     defer stdinBuffer.deinit();
-
-    var dsp = display.Display.init(allocator);
-    defer dsp.deinit();
-
-    dsp.drawSplash();
 
     // Read from stdin until there's nothing more to read.
     while (true) {
