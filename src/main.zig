@@ -49,6 +49,8 @@ pub fn main() !void {
     defer stdinBuffer.deinit();
 
     var dsp = display.Display.init(allocator);
+    defer dsp.deinit();
+
     dsp.drawSplash();
 
     // Read from stdin until there's nothing more to read.
@@ -74,7 +76,6 @@ pub fn main() !void {
     }
 
     std.time.sleep(10 * std.time.ns_per_s);
-    dsp.deinit();
 }
 
 test "main" {

@@ -1,6 +1,7 @@
 const std = @import("std");
 const raylib = @cImport(@cInclude("raylib.h"));
 const watershed = @import("watershed.zig");
+const config = @import("config");
 
 const screenWidth = 400;
 const screenHeight = 240;
@@ -10,6 +11,9 @@ pub const Display = struct {
 
     pub fn init(allocator: std.mem.Allocator) Display {
         raylib.InitWindow(screenWidth, screenHeight, "Beepy LCD display");
+        if (config.beepyMode) {
+            raylib.SetTargetFPS(5);
+        }
         return Display{
             .textBuffer = std.ArrayList(u8).init(allocator),
         };

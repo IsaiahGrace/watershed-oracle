@@ -16,9 +16,11 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const beepyMode = b.option(bool, "beepyMode", "Compile with Beepy specific features") orelse false;
+
     // From lib/raylib/build.zig
     const raylibOptions = raylib.Options{
-        .platform_drm = b.option(bool, "platform_drm", "Compile raylib in native mode (no X11)") orelse false,
+        .platform_drm = beepyMode,
         .raudio = false,
         .rmodels = false,
         .rtext = true,
@@ -49,6 +51,10 @@ pub fn build(b: *std.Build) void {
     exe.addIncludePath(.{ .path = "lib/raylib" });
     exe.linkLibrary(rlib);
     b.installArtifact(exe);
+
+    const options = b.addOptions();
+    options.addOption(bool, "beepyMode", beepyMode);
+    exe.addOptions("config", options);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
