@@ -13,6 +13,13 @@ pub const Watershed = struct {
     geom: *geos_c.GEOSGeometry,
 };
 
+const Bounds = struct {
+    minX: f64,
+    maxX: f64,
+    minY: f64,
+    maxY: f64,
+};
+
 pub const WatershedStack = struct {
     allocator: std.mem.Allocator,
     sctx: SqliteCtx,
@@ -24,6 +31,7 @@ pub const WatershedStack = struct {
     skipHuc14and16: bool,
 
     point: geos_c.GEOSGeom,
+    pointBounds: Bounds,
 
     huc2: ?Watershed,
     huc4: ?Watershed,
@@ -54,6 +62,12 @@ pub const WatershedStack = struct {
             .dsp = dsp,
             .skipHuc14and16 = skipHuc14and16,
             .point = null,
+            .pointBounds = .{
+                .minX = std.math.floatMax(f64),
+                .maxX = std.math.floatMin(f64),
+                .minY = std.math.floatMax(f64),
+                .maxY = std.math.floatMin(f64),
+            },
             .huc2 = null,
             .huc4 = null,
             .huc6 = null,
@@ -175,6 +189,17 @@ pub const WatershedStack = struct {
     fn update(self: *WatershedStack) !void {
         // The point has been updated, now re-validate the watershed stack.
         if (self.point == null) return error.updateNullPoint;
+
+        // We'll use these to compare against the bounding boxes
+        // GEOS will return zero if there was an exception getting the min/max.
+        if (geos_c.GEOSGeom_getXMin_r(self.gctx.handle, self.point, &self.pointBounds.minX) == 0)
+            self.pointBounds.minX = std.math.floatMax(f64);
+        if (geos_c.GEOSGeom_getXMax_r(self.gctx.handle, self.point, &self.pointBounds.maxX) == 0)
+            self.pointBounds.maxX = std.math.floatMin(f64);
+        if (geos_c.GEOSGeom_getYMin_r(self.gctx.handle, self.point, &self.pointBounds.minY) == 0)
+            self.pointBounds.minY = std.math.floatMax(f64);
+        if (geos_c.GEOSGeom_getYMax_r(self.gctx.handle, self.point, &self.pointBounds.maxY) == 0)
+            self.pointBounds.maxY = std.math.floatMin(f64);
 
         const err = if (self.skipHuc14and16)
             self.checkHUC12()
@@ -366,69 +391,104 @@ pub const WatershedStack = struct {
         }
     }
 
-    fn search(self: *WatershedStack, hucLevel: []const u8, tableName: [*:0]const u8, likePattern: []const u8) !Watershed {
-        const queryString = try std.fmt.allocPrintZ(self.allocator, "SELECT rowid,{s},name FROM \"{s}\" WHERE \"{s}\" LIKE '{s}%';", .{ hucLevel, tableName, hucLevel, likePattern });
-        defer self.allocator.free(queryString);
+    fn searchStep(
+        self: *WatershedStack,
+        tableName: [*:0]const u8,
+        statement: *sqlite.sqlite3_stmt,
+        reader: *geos_c.GEOSWKBReader,
+    ) !?*geos_c.GEOSGeometry {
+        // Run an SQLite3 step on the statement, generating the next result from our query
+        const stepResult = try sqliteErrors.stepCheck(sqlite.sqlite3_step(statement));
+        if (stepResult == sqlite.SQLITE_DONE) return error.pointNotInDataset;
 
-        var statement: ?*sqlite.sqlite3_stmt = null;
-        try sqliteErrors.check(sqlite.sqlite3_prepare_v2(self.sctx.conn, queryString, @intCast(queryString.len), &statement, null));
-        defer sqliteErrors.log(sqlite.sqlite3_finalize(statement));
+        std.log.debug("huc: {s} - {s}", .{
+            std.mem.span(sqlite.sqlite3_column_text(statement, 1)),
+            std.mem.span(sqlite.sqlite3_column_text(statement, 2)),
+        });
 
-        var newGeom: ?*geos_c.GEOSGeometry = null;
+        // Open the shape column of the result row in blob mode, so we can read just the header of
+        // the geometry. The header contains the bounds of the shape, so we can compare our point to
+        // these bounds as a cheaper check for coverage, instead of loading the entire polygon.
+        const rowid = sqlite.sqlite3_column_int64(statement, 0);
+        var blob: ?*sqlite.sqlite3_blob = null;
+        try sqliteErrors.check(
+            sqlite.sqlite3_blob_open(self.sctx.conn, "main", tableName, "shape", rowid, 0, &blob),
+        );
+        defer sqliteErrors.log(sqlite.sqlite3_blob_close(blob));
 
-        var reader = geos_c.GEOSWKBReader_create_r(self.gctx.handle);
-        defer geos_c.GEOSWKBReader_destroy_r(self.gctx.handle, reader);
+        var header: gpkg.HeaderAndEnvelopeXY = undefined;
+        try sqliteErrors.check(sqlite.sqlite3_blob_read(blob, &header, @sizeOf(@TypeOf(header)), 0));
 
-        // We'll use these to compare against the bounding boxes
-        var pminX: f64 = undefined;
-        var pmaxX: f64 = undefined;
-        var pminY: f64 = undefined;
-        var pmaxY: f64 = undefined;
-        // GEOS will return zero if there was an exception getting the min/max.
-        if (geos_c.GEOSGeom_getXMin_r(self.gctx.handle, self.point, &pminX) == 0) pminX = std.math.floatMax(f64);
-        if (geos_c.GEOSGeom_getXMax_r(self.gctx.handle, self.point, &pmaxX) == 0) pmaxX = std.math.floatMin(f64);
-        if (geos_c.GEOSGeom_getYMin_r(self.gctx.handle, self.point, &pminY) == 0) pminY = std.math.floatMax(f64);
-        if (geos_c.GEOSGeom_getYMax_r(self.gctx.handle, self.point, &pmaxY) == 0) pmaxY = std.math.floatMin(f64);
+        // Compare the header envelope with our points bounds, to see if we even need to read the full point geometry
+        if ((header.envelopeXY.minx > self.pointBounds.maxX) or
+            (header.envelopeXY.maxx < self.pointBounds.minX) or
+            (header.envelopeXY.miny > self.pointBounds.maxY) or
+            (header.envelopeXY.maxy < self.pointBounds.minY))
+        {
+            return null;
+        }
 
-        while (true) {
-            const stepResult = try sqliteErrors.stepCheck(sqlite.sqlite3_step(statement));
-            if (stepResult == sqlite.SQLITE_DONE) return error.pointNotInDataset;
-
-            std.log.debug("huc: {s} - {s}", .{
-                std.mem.span(sqlite.sqlite3_column_text(statement, 1)),
-                std.mem.span(sqlite.sqlite3_column_text(statement, 2)),
-            });
-
-            const rowid = sqlite.sqlite3_column_int64(statement, 0);
-            var blob: ?*sqlite.sqlite3_blob = null;
-            try sqliteErrors.check(sqlite.sqlite3_blob_open(self.sctx.conn, "main", tableName, "shape", rowid, 0, &blob));
-            defer sqliteErrors.log(sqlite.sqlite3_blob_close(blob));
-
-            var header: gpkg.HeaderAndEnvelopeXY = undefined;
-            try sqliteErrors.check(sqlite.sqlite3_blob_read(blob, &header, @sizeOf(@TypeOf(header)), 0));
-
-            if ((header.envelopeXY.minx > pmaxX) or (header.envelopeXY.maxx < pminX) or (header.envelopeXY.miny > pmaxY) or (header.envelopeXY.maxy < pminY)) {
-                continue;
-            }
-
+        const geometry = geom: {
             const blobSize: usize = @intCast(sqlite.sqlite3_blob_bytes(blob));
             const shapeBuffer: []u8 = try self.allocator.alloc(u8, blobSize - @sizeOf(@TypeOf(header)));
             defer self.allocator.free(shapeBuffer);
-            try sqliteErrors.check(sqlite.sqlite3_blob_read(blob, shapeBuffer.ptr, @intCast(shapeBuffer.len), @sizeOf(@TypeOf(header))));
+            try sqliteErrors.check(
+                sqlite.sqlite3_blob_read(blob, shapeBuffer.ptr, @intCast(shapeBuffer.len), @sizeOf(@TypeOf(header))),
+            );
+            break :geom geos_c.GEOSWKBReader_read_r(self.gctx.handle, reader, shapeBuffer.ptr, shapeBuffer.len).?;
+        };
 
-            newGeom = geos_c.GEOSWKBReader_read_r(self.gctx.handle, reader, shapeBuffer.ptr, shapeBuffer.len);
-            if (newGeom == null) return error.ReaderParseError;
-
-            // if it does cover us, break!
-            if (geos_c.GEOSCovers_r(self.gctx.handle, newGeom, self.point) == 1) {
-                std.log.debug("Compared Geometry - Point within watershed!", .{});
-                break;
-            } else {
-                std.log.debug("Compared Geometry - Point outside watershed.", .{});
-                geos_c.GEOSGeom_destroy_r(self.gctx.handle, newGeom);
-                newGeom = null;
-            }
+        // Check if the new geometry covers our point of interest
+        if (geos_c.GEOSCovers_r(self.gctx.handle, geometry, self.point) != 1) {
+            std.log.debug("Compared Geometry - Point outside watershed.", .{});
+            geos_c.GEOSGeom_destroy_r(self.gctx.handle, geometry);
+            return null;
         }
+
+        std.log.debug("Compared Geometry - Point within watershed!", .{});
+        return geometry;
+    }
+
+    fn search(
+        self: *WatershedStack,
+        hucLevel: []const u8,
+        tableName: [*:0]const u8,
+        likePattern: []const u8,
+    ) !Watershed {
+        // Create the SQL query string
+        const queryString = try std.fmt.allocPrintZ(
+            self.allocator,
+            "SELECT rowid,{s},name FROM \"{s}\" WHERE \"{s}\" LIKE '{s}%';",
+            .{ hucLevel, tableName, hucLevel, likePattern },
+        );
+        defer self.allocator.free(queryString);
+
+        // Prepare the SQLite3 statement from the query string
+        const statement = stmt: {
+            var optStatement: ?*sqlite.sqlite3_stmt = null;
+            try sqliteErrors.check(
+                sqlite.sqlite3_prepare_v2(
+                    self.sctx.conn,
+                    queryString,
+                    @intCast(queryString.len),
+                    &optStatement,
+                    null,
+                ),
+            );
+            break :stmt optStatement.?;
+        };
+        defer sqliteErrors.log(sqlite.sqlite3_finalize(statement));
+
+        // Create a new geos WKB reader to parse the shape blobs we'll read from the DB
+        const reader = geos_c.GEOSWKBReader_create_r(self.gctx.handle).?;
+        defer geos_c.GEOSWKBReader_destroy_r(self.gctx.handle, reader);
+
+        // Repeat searchStep() until we find a matching geometry, or an error is returned
+        const newGeom = geom: {
+            while (true) {
+                if (try self.searchStep(tableName, statement, reader)) |g| break :geom g;
+            }
+        };
 
         // Once we've found the point assign the huc and name.
         var newHuc = [16]u8{ ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' };
@@ -443,7 +503,7 @@ pub const WatershedStack = struct {
         return Watershed{
             .huc = newHuc,
             .name = newName,
-            .geom = newGeom.?,
+            .geom = newGeom,
         };
     }
 };
