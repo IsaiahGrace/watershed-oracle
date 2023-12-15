@@ -166,6 +166,12 @@ pub const WatershedStack = struct {
             geos_c.GEOSGeom_destroy_r(self.gctx.handle, point);
             self.point = null;
         }
+        self.pointBounds = .{
+            .minX = std.math.floatMax(f64),
+            .maxX = std.math.floatMin(f64),
+            .minY = std.math.floatMax(f64),
+            .maxY = std.math.floatMin(f64),
+        };
     }
 
     pub fn updateWKT(self: *WatershedStack, newPoint: [*:0]const u8) !void {
