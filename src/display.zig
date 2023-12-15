@@ -29,7 +29,7 @@ pub const Display = struct {
         raylib.SwapScreenBuffer();
     }
 
-    fn drawWatershed(self: *Display, wshed: watershed.Watershed, posY: c_int) !void {
+    fn drawWatershed(self: *Display, wshed: *watershed.Watershed, posY: c_int) !void {
         self.textBuffer.clearRetainingCapacity();
         try self.textBuffer.appendSlice(&wshed.huc);
         try self.textBuffer.append(0);
@@ -40,6 +40,11 @@ pub const Display = struct {
         raylib.DrawText(self.textBuffer.items.ptr, 20, posY + 10, 20, raylib.BLACK);
     }
 
+    fn drawCalculating(self: *Display, posY: c_int) void {
+        _ = self;
+        raylib.DrawText("calculating...", 20, posY + 10, 20, raylib.BLACK);
+    }
+
     pub fn drawWatershedStack(self: *Display, watershedStack: *watershed.WatershedStack) !void {
         raylib.BeginDrawing();
 
@@ -48,12 +53,30 @@ pub const Display = struct {
         raylib.DrawText("Your watershed stack:", 20, 10, 20, raylib.BLACK);
         raylib.DrawLine(18, 35, screenWidth - 18, 35, raylib.BLACK);
 
-        if (watershedStack.huc2) |w| try self.drawWatershed(w, 40);
-        if (watershedStack.huc4) |w| try self.drawWatershed(w, 70);
-        if (watershedStack.huc6) |w| try self.drawWatershed(w, 100);
-        if (watershedStack.huc8) |w| try self.drawWatershed(w, 130);
-        if (watershedStack.huc10) |w| try self.drawWatershed(w, 160);
-        if (watershedStack.huc12) |w| try self.drawWatershed(w, 190);
+        const DispData = struct {
+            w: *?watershed.Watershed,
+            posY: c_int,
+        };
+        const dispArray = [_]DispData{
+            .{ .w = &watershedStack.huc2, .posY = 40 },
+            .{ .w = &watershedStack.huc4, .posY = 70 },
+            .{ .w = &watershedStack.huc6, .posY = 100 },
+            .{ .w = &watershedStack.huc8, .posY = 130 },
+            .{ .w = &watershedStack.huc10, .posY = 160 },
+            .{ .w = &watershedStack.huc12, .posY = 190 },
+        };
+
+        var printedCalculating = false;
+
+        for (dispArray) |d| {
+            if (d.w.*) |*w| {
+                try self.drawWatershed(w, d.posY);
+            } else if (!printedCalculating) {
+                std.log.debug("Printing Calculating. posY = {d}", .{d.posY});
+                self.drawCalculating(d.posY);
+                printedCalculating = true;
+            }
+        }
 
         raylib.EndDrawing();
         raylib.SwapScreenBuffer();

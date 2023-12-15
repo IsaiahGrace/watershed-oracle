@@ -44,8 +44,6 @@ pub fn main() !void {
         try watershedStack.logPoint();
         try watershedStack.logStack();
 
-        try dsp.drawWatershedStack(&watershedStack);
-
         stdinBuffer.clearRetainingCapacity();
     }
 
