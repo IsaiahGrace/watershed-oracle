@@ -11,4 +11,4 @@ echo
 echo "Building watershed-oracle on Beepy device"
 echo
 
-ssh beepy "cd repos/watershed-oracle; /home/isaiah/zig-linux-armv7a-0.11.0/zig build -DbeepyMode=true"
+ssh beepy "cd repos/watershed-oracle; /home/isaiah/zig-linux-armv7a-0.11.0/zig build -Dframebuffer"

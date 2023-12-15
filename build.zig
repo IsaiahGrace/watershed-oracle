@@ -16,11 +16,11 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const beepyMode = b.option(bool, "beepyMode", "Compile with Beepy specific features") orelse false;
+    const framebuffer = b.option(bool, "framebuffer", "Compile with framebuffer support (Beepy hardware only)") orelse false;
 
     // From lib/raylib/build.zig
     const raylibOptions = raylib.Options{
-        .platform_drm = beepyMode,
+        .platform_drm = framebuffer,
         .raudio = false,
         .rmodels = false,
         .rtext = true,
@@ -29,7 +29,6 @@ pub fn build(b: *std.Build) void {
         .raygui = false,
     };
     const rlib = raylib.addRaylib(b, target, optimize, raylibOptions);
-    b.installArtifact(rlib);
 
     // This "clap" refers to the .clap field in the build.zig.zon file
     const clap = b.dependency("clap", .{
@@ -37,29 +36,40 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const exe = b.addExecutable(.{
-        .name = "watershedOracle",
-        .root_source_file = .{ .path = "src/main.zig" },
+    // watershedBeepy is a full app intended to run on the Beepy. It drives the 400x240 display using raylib.
+    const beepy = b.addExecutable(.{
+        .name = "watershedBeepy",
+        .root_source_file = .{ .path = "src/beepyMain.zig" },
         .target = target,
         .optimize = optimize,
     });
-    // The first "clap" refers to build.zig.zon, the second "clap" refers to the b.addModule("clap", ...) call in the zig-clap build.zig file.
-    exe.addModule("clap", clap.module("clap"));
-    exe.linkLibC();
-    exe.linkSystemLibrary("geos_c");
-    exe.linkSystemLibrary("sqlite3");
-    exe.addIncludePath(.{ .path = "lib/raylib" });
-    exe.linkLibrary(rlib);
-    b.installArtifact(exe);
+    beepy.addModule("clap", clap.module("clap"));
+    beepy.linkLibC();
+    beepy.linkSystemLibrary("geos_c");
+    beepy.linkSystemLibrary("sqlite3");
+    beepy.addIncludePath(.{ .path = "lib/raylib" });
+    beepy.linkLibrary(rlib);
+    b.installArtifact(beepy);
 
-    const options = b.addOptions();
-    options.addOption(bool, "beepyMode", beepyMode);
-    exe.addOptions("config", options);
+    // watershedCore is just the lookup engine, reading WKT point data from stdin, and printing watershed data to stdout.
+    const core = b.addExecutable(.{
+        .name = "watershedCore",
+        .root_source_file = .{ .path = "src/coreMain.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    core.addModule("clap", clap.module("clap"));
+    core.linkLibC();
+    core.linkSystemLibrary("geos_c");
+    core.linkSystemLibrary("sqlite3");
+    core.addIncludePath(.{ .path = "lib/raylib" });
+    core.linkLibrary(rlib);
+    b.installArtifact(core);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
     // such a dependency.
-    const run_cmd = b.addRunArtifact(exe);
+    const run_cmd = b.addRunArtifact(core);
 
     // By making the run step depend on the install step, it will be run from the
     // installation directory rather than directly from within the cache directory.
@@ -81,21 +91,36 @@ pub fn build(b: *std.Build) void {
 
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
-    const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+    const core_tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/coreMain.zig" },
         .target = target,
         .optimize = optimize,
     });
-    unit_tests.addModule("clap", clap.module("clap"));
-    unit_tests.linkLibC();
-    unit_tests.linkSystemLibrary("geos_c");
-    unit_tests.linkSystemLibrary("sqlite3");
+    core_tests.addModule("clap", clap.module("clap"));
+    core_tests.linkLibC();
+    core_tests.linkSystemLibrary("geos_c");
+    core_tests.linkSystemLibrary("sqlite3");
+    core_tests.addIncludePath(.{ .path = "lib/raylib" });
+    core_tests.linkLibrary(rlib);
+    const run_core_tests = b.addRunArtifact(core_tests);
 
-    const run_unit_tests = b.addRunArtifact(unit_tests);
+    const beepy_tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/beepyMain.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    beepy_tests.addModule("clap", clap.module("clap"));
+    beepy_tests.linkLibC();
+    beepy_tests.linkSystemLibrary("geos_c");
+    beepy_tests.linkSystemLibrary("sqlite3");
+    beepy_tests.addIncludePath(.{ .path = "lib/raylib" });
+    beepy_tests.linkLibrary(rlib);
+    const run_beepy_tests = b.addRunArtifact(beepy_tests);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_unit_tests.step);
+    test_step.dependOn(&run_core_tests.step);
+    test_step.dependOn(&run_beepy_tests.step);
 }

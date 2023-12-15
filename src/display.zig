@@ -1,7 +1,6 @@
-const std = @import("std");
 const raylib = @cImport(@cInclude("raylib.h"));
+const std = @import("std");
 const watershed = @import("watershed.zig");
-const config = @import("config");
 
 const screenWidth = 400;
 const screenHeight = 240;
