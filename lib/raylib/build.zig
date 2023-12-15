@@ -21,6 +21,12 @@ pub fn addRaylib(b: *std.Build, target: std.zig.CrossTarget, optimize: std.built
         raylib.addIncludePath(.{ .path = srcdir ++ "/external/glfw/include" });
     }
 
+    if (options.arm) {
+        raylib.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc" });
+        raylib.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf" });
+        raylib.addLibraryPath(.{ .path = "lib/arm-linux-gnueabihf/lib" });
+    }
+
     addCSourceFilesVersioned(raylib, &.{
         srcdir ++ "/rcore.c",
         srcdir ++ "/utils.c",
@@ -165,13 +171,14 @@ pub fn addRaylib(b: *std.Build, target: std.zig.CrossTarget, optimize: std.built
 }
 
 pub const Options = struct {
+    arm: bool = false,
+    platform_drm: bool = false,
     raudio: bool = true,
+    raygui: bool = false,
     rmodels: bool = true,
     rshapes: bool = true,
     rtext: bool = true,
     rtextures: bool = true,
-    raygui: bool = false,
-    platform_drm: bool = false,
 };
 
 pub fn build(b: *std.Build) void {

@@ -1,75 +1,175 @@
 const std = @import("std");
 const raylib = @import("lib/raylib/build.zig");
 
+// We're going to be compiling 4 binaries
+// 1. watershedCoreNative -> A simple stdin->stdout text based lookup algorithm
+// 2. watershedGuiNative  -> A simulation of the beepy screen
+// 3. watershedCoreArm    -> A cross-compiled version of the core lookup algorithm
+// 4. watershedGuiArm     -> The "real" beepy application. Drives the screen using raylib in framebuffer mode.
+
+const armTargetTriplet = "arm-linux-gnueabihf";
+const armCpuFeatures = "cortex_a53";
+
+fn addWatershedCoreNative(
+    b: *std.Build,
+    target: std.zig.CrossTarget,
+    optimize: std.builtin.OptimizeMode,
+) !*std.Build.CompileStep {
+    const watershedCoreNative = b.addExecutable(.{
+        .name = "watershedCoreNative",
+        .root_source_file = .{ .path = "src/mainCore.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    watershedCoreNative.linkLibC();
+    watershedCoreNative.linkSystemLibrary("geos_c");
+    watershedCoreNative.linkSystemLibrary("sqlite3");
+    watershedCoreNative.addIncludePath(.{ .path = "lib/raylib" });
+    return watershedCoreNative;
+}
+
+fn addWatershedGuiNative(
+    b: *std.Build,
+    target: std.zig.CrossTarget,
+    optimize: std.builtin.OptimizeMode,
+) !*std.Build.CompileStep {
+    const watershedGuiNative = b.addExecutable(.{
+        .name = "watershedGuiNative",
+        .root_source_file = .{ .path = "src/mainGui.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    watershedGuiNative.linkLibC();
+    watershedGuiNative.linkSystemLibrary("geos_c");
+    watershedGuiNative.linkSystemLibrary("sqlite3");
+    watershedGuiNative.addIncludePath(.{ .path = "lib/raylib" });
+    return watershedGuiNative;
+}
+
+fn addWatershedCoreArm(
+    b: *std.Build,
+    optimize: std.builtin.OptimizeMode,
+) !*std.Build.CompileStep {
+    const target = try std.zig.CrossTarget.parse(.{
+        .arch_os_abi = armTargetTriplet,
+        .cpu_features = armCpuFeatures,
+    });
+    const watershedCoreArm = b.addExecutable(.{
+        .name = "watershedCoreArm",
+        .root_source_file = .{ .path = "src/mainCore.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    watershedCoreArm.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc" });
+    watershedCoreArm.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf" });
+    watershedCoreArm.addIncludePath(.{ .path = "lib/raylib" });
+    watershedCoreArm.addLibraryPath(.{ .path = "lib/arm-linux-gnueabihf/lib" });
+    watershedCoreArm.linkLibC();
+    watershedCoreArm.linkSystemLibrary("geos_c");
+    watershedCoreArm.linkSystemLibrary("sqlite3");
+    return watershedCoreArm;
+}
+
+fn addWatershedGuiArm(
+    b: *std.Build,
+    optimize: std.builtin.OptimizeMode,
+) !*std.Build.CompileStep {
+    const target = try std.zig.CrossTarget.parse(.{
+        .arch_os_abi = armTargetTriplet,
+        .cpu_features = armCpuFeatures,
+    });
+    const watershedGuiArm = b.addExecutable(.{
+        .name = "watershedGuiArm",
+        .root_source_file = .{ .path = "src/mainGui.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    watershedGuiArm.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc" });
+    watershedGuiArm.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf" });
+    watershedGuiArm.addIncludePath(.{ .path = "lib/raylib" });
+    watershedGuiArm.addLibraryPath(.{ .path = "lib/arm-linux-gnueabihf/lib" });
+    watershedGuiArm.linkLibC();
+    watershedGuiArm.linkSystemLibrary("geos_c");
+    watershedGuiArm.linkSystemLibrary("sqlite3");
+    return watershedGuiArm;
+}
+
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
+    const targetArm = try std.zig.CrossTarget.parse(.{
+        .arch_os_abi = armTargetTriplet,
+        .cpu_features = armCpuFeatures,
+    });
 
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const framebuffer = b.option(bool, "framebuffer", "Compile with framebuffer support (Beepy hardware only)") orelse false;
+    // This "clap" refers to the .clap field in the build.zig.zon file
+    const clapNative = b.dependency("clap", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
-    // From lib/raylib/build.zig
-    const raylibOptions = raylib.Options{
-        .platform_drm = framebuffer,
+    const clapArm = b.dependency("clap", .{
+        .target = target,
+        .optimize = targetArm,
+    });
+
+    const rlibNative = raylib.addRaylib(b, target, optimize, .{
+        .arm = false,
+        .platform_drm = false,
         .raudio = false,
+        .raygui = false,
         .rmodels = false,
+        .rshapes = true,
         .rtext = true,
         .rtextures = true,
-        .rshapes = true,
+    });
+
+    const rlibArm = raylib.addRaylib(b, targetArm, optimize, .{
+        .arm = true,
+        .platform_drm = true,
+        .raudio = false,
         .raygui = false,
-    };
-    const rlib = raylib.addRaylib(b, target, optimize, raylibOptions);
-
-    // This "clap" refers to the .clap field in the build.zig.zon file
-    const clap = b.dependency("clap", .{
-        .target = target,
-        .optimize = optimize,
+        .rmodels = false,
+        .rshapes = true,
+        .rtext = true,
+        .rtextures = true,
     });
 
-    // watershedBeepy is a full app intended to run on the Beepy. It drives the 400x240 display using raylib.
-    const beepy = b.addExecutable(.{
-        .name = "watershedBeepy",
-        .root_source_file = .{ .path = "src/beepyMain.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    beepy.addModule("clap", clap.module("clap"));
-    beepy.linkLibC();
-    beepy.linkSystemLibrary("geos_c");
-    beepy.linkSystemLibrary("sqlite3");
-    beepy.addIncludePath(.{ .path = "lib/raylib" });
-    beepy.linkLibrary(rlib);
-    b.installArtifact(beepy);
+    const watershedCoreNative = try addWatershedCoreNative(b, target, optimize);
+    watershedCoreNative.addModule("clap", clapNative.module("clap"));
+    watershedCoreNative.linkLibrary(rlibNative);
+    b.installArtifact(watershedCoreNative);
 
-    // watershedCore is just the lookup engine, reading WKT point data from stdin, and printing watershed data to stdout.
-    const core = b.addExecutable(.{
-        .name = "watershedCore",
-        .root_source_file = .{ .path = "src/coreMain.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    core.addModule("clap", clap.module("clap"));
-    core.linkLibC();
-    core.linkSystemLibrary("geos_c");
-    core.linkSystemLibrary("sqlite3");
-    core.addIncludePath(.{ .path = "lib/raylib" });
-    core.linkLibrary(rlib);
-    b.installArtifact(core);
+    const watershedGuiNative = try addWatershedGuiNative(b, target, optimize);
+    watershedGuiNative.addModule("clap", clapNative.module("clap"));
+    watershedGuiNative.linkLibrary(rlibNative);
+    b.installArtifact(watershedGuiNative);
+
+    const watershedCoreArm = try addWatershedCoreArm(b, optimize);
+    watershedCoreArm.addModule("clap", clapArm.module("clap"));
+    watershedCoreArm.linkLibrary(rlibArm);
+    b.installArtifact(watershedCoreArm);
+
+    const watershedGuiArm = try addWatershedGuiArm(b, optimize);
+    watershedGuiArm.addModule("clap", clapArm.module("clap"));
+    watershedGuiArm.linkLibrary(rlibArm);
+    b.installArtifact(watershedGuiArm);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
     // such a dependency.
-    const run_cmd = b.addRunArtifact(core);
+    const run_cmd = b.addRunArtifact(watershedCoreNative);
 
     // By making the run step depend on the install step, it will be run from the
     // installation directory rather than directly from within the cache directory.
@@ -89,38 +189,37 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    // Creates a step for unit testing. This only builds the test executable
-    // but does not run it.
+    // Because we have two top level files, we'll compile two sets of unit tests
     const core_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/coreMain.zig" },
+        .root_source_file = .{ .path = "src/mainCore.zig" },
         .target = target,
         .optimize = optimize,
     });
-    core_tests.addModule("clap", clap.module("clap"));
+    core_tests.addModule("clap", clapNative.module("clap"));
     core_tests.linkLibC();
     core_tests.linkSystemLibrary("geos_c");
     core_tests.linkSystemLibrary("sqlite3");
     core_tests.addIncludePath(.{ .path = "lib/raylib" });
-    core_tests.linkLibrary(rlib);
+    core_tests.linkLibrary(rlibNative);
     const run_core_tests = b.addRunArtifact(core_tests);
 
-    const beepy_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/beepyMain.zig" },
+    const gui_tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/mainGui.zig" },
         .target = target,
         .optimize = optimize,
     });
-    beepy_tests.addModule("clap", clap.module("clap"));
-    beepy_tests.linkLibC();
-    beepy_tests.linkSystemLibrary("geos_c");
-    beepy_tests.linkSystemLibrary("sqlite3");
-    beepy_tests.addIncludePath(.{ .path = "lib/raylib" });
-    beepy_tests.linkLibrary(rlib);
-    const run_beepy_tests = b.addRunArtifact(beepy_tests);
+    gui_tests.addModule("clap", clapNative.module("clap"));
+    gui_tests.linkLibC();
+    gui_tests.linkSystemLibrary("geos_c");
+    gui_tests.linkSystemLibrary("sqlite3");
+    gui_tests.addIncludePath(.{ .path = "lib/raylib" });
+    gui_tests.linkLibrary(rlibNative);
+    const run_gui_tests = b.addRunArtifact(gui_tests);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_core_tests.step);
-    test_step.dependOn(&run_beepy_tests.step);
+    test_step.dependOn(&run_gui_tests.step);
 }
