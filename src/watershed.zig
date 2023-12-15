@@ -1,4 +1,5 @@
-const display = @import("display.zig");
+const config = @import("config");
+const display = if (config.gui) @import("display.zig") else @import("dummyDisplay.zig");
 const geos_c = @cImport(@cInclude("geos_c.h"));
 const GeosCtx = @import("geosCtx.zig").GeosCtx;
 const gpkg = @import("gpkg.zig");

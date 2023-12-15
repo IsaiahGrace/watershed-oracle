@@ -24,7 +24,6 @@ fn addWatershedCoreNative(
     watershedCoreNative.linkLibC();
     watershedCoreNative.linkSystemLibrary("geos_c");
     watershedCoreNative.linkSystemLibrary("sqlite3");
-    watershedCoreNative.addIncludePath(.{ .path = "lib/raylib" });
     return watershedCoreNative;
 }
 
@@ -62,7 +61,6 @@ fn addWatershedCoreArm(
     });
     watershedCoreArm.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc" });
     watershedCoreArm.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf" });
-    watershedCoreArm.addIncludePath(.{ .path = "lib/raylib" });
     watershedCoreArm.addLibraryPath(.{ .path = "lib/arm-linux-gnueabihf/lib" });
     watershedCoreArm.linkLibC();
     watershedCoreArm.linkSystemLibrary("geos_c");
@@ -113,6 +111,12 @@ pub fn build(b: *std.Build) !void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const optionsGui = b.addOptions();
+    optionsGui.addOption(bool, "gui", true);
+
+    const optionsCore = b.addOptions();
+    optionsCore.addOption(bool, "gui", false);
+
     // This "clap" refers to the .clap field in the build.zig.zon file
     const clapNative = b.dependency("clap", .{
         .target = target,
@@ -146,23 +150,27 @@ pub fn build(b: *std.Build) !void {
         .rtextures = true,
     });
 
+    // Add the "Core" binaries, no raylib needed
     const watershedCoreNative = try addWatershedCoreNative(b, target, optimize);
     watershedCoreNative.addModule("clap", clapNative.module("clap"));
-    watershedCoreNative.linkLibrary(rlibNative);
+    watershedCoreNative.addOptions("config", optionsCore);
     b.installArtifact(watershedCoreNative);
-
-    const watershedGuiNative = try addWatershedGuiNative(b, target, optimize);
-    watershedGuiNative.addModule("clap", clapNative.module("clap"));
-    watershedGuiNative.linkLibrary(rlibNative);
-    b.installArtifact(watershedGuiNative);
 
     const watershedCoreArm = try addWatershedCoreArm(b, optimize);
     watershedCoreArm.addModule("clap", clapArm.module("clap"));
-    watershedCoreArm.linkLibrary(rlibArm);
+    watershedCoreArm.addOptions("config", optionsCore);
     b.installArtifact(watershedCoreArm);
+
+    // Add the "Gui" binaries, with raylib linked and included
+    const watershedGuiNative = try addWatershedGuiNative(b, target, optimize);
+    watershedGuiNative.addModule("clap", clapNative.module("clap"));
+    watershedGuiNative.addOptions("config", optionsGui);
+    watershedGuiNative.linkLibrary(rlibNative);
+    b.installArtifact(watershedGuiNative);
 
     const watershedGuiArm = try addWatershedGuiArm(b, optimize);
     watershedGuiArm.addModule("clap", clapArm.module("clap"));
+    watershedGuiArm.addOptions("config", optionsGui);
     watershedGuiArm.linkLibrary(rlibArm);
     b.installArtifact(watershedGuiArm);
 
