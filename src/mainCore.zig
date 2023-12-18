@@ -1,4 +1,5 @@
 const args = @import("args.zig");
+const Display = @import("DisplayInterface.zig").Display;
 const std = @import("std");
 const watershed = @import("watershed.zig");
 
@@ -14,7 +15,10 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) std.log.err("GPA detected a leak!", .{});
     const allocator: std.mem.Allocator = gpa.allocator();
 
-    var watershedStack = try watershed.WatershedStack.init(allocator, null, cliArgs.databasePath, cliArgs.skipHuc14and16);
+    var dummyDsp = Display.init();
+    defer dummyDsp.deinit();
+
+    var watershedStack = try watershed.WatershedStack.init(allocator, &dummyDsp, cliArgs.databasePath, cliArgs.skipHuc14and16);
     defer watershedStack.deinit();
 
     const stdin = std.io.getStdIn().reader();

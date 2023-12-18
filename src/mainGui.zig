@@ -1,5 +1,5 @@
 const args = @import("args.zig");
-const display = @import("display.zig");
+const Display = @import("DisplayInterface.zig").Display;
 const std = @import("std");
 const watershed = @import("watershed.zig");
 
@@ -15,7 +15,7 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) std.log.err("GPA detected a leak!", .{});
     const allocator: std.mem.Allocator = gpa.allocator();
 
-    var dsp = display.Display.init(allocator);
+    var dsp = Display.init(allocator);
     defer dsp.deinit();
     dsp.drawSplash();
 

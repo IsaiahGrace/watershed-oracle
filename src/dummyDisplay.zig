@@ -6,33 +6,32 @@ const watershed = @import("watershed.zig");
 
 // This is kinda like a compile time vtable :)
 
-pub const Display = struct {
-    pub fn init(allocator: std.mem.Allocator) Display {
-        _ = allocator;
-        return Display{};
-    }
+pub const Display = @This();
 
-    pub fn deinit(self: *Display) void {
-        _ = self;
-    }
+pub fn init() Display {
+    return Display{};
+}
 
-    pub fn drawSplash(self: *const Display) void {
-        _ = self;
-    }
+pub fn deinit(self: *Display) void {
+    _ = self;
+}
 
-    fn drawWatershed(self: *Display, wshed: *watershed.Watershed, posY: c_int) !void {
-        _ = posY;
-        _ = wshed;
-        _ = self;
-    }
+pub fn drawSplash(self: *const Display) void {
+    _ = self;
+}
 
-    fn drawCalculating(self: *Display, posY: c_int) void {
-        _ = posY;
-        _ = self;
-    }
+fn drawWatershed(self: *Display, wshed: *watershed.Watershed, posY: c_int) !void {
+    _ = posY;
+    _ = wshed;
+    _ = self;
+}
 
-    pub fn drawWatershedStack(self: *Display, watershedStack: *watershed.WatershedStack) !void {
-        _ = watershedStack;
-        _ = self;
-    }
-};
+fn drawCalculating(self: *Display, posY: c_int) void {
+    _ = posY;
+    _ = self;
+}
+
+pub fn drawWatershedStack(self: *Display, watershedStack: *watershed.WatershedStack) !void {
+    _ = watershedStack;
+    _ = self;
+}
