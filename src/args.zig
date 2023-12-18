@@ -3,7 +3,7 @@ const std = @import("std");
 
 const ProgramType = enum {
     core,
-    beepy,
+    gui,
 };
 
 const Args = struct {
@@ -28,9 +28,9 @@ fn printCoreHelp() !void {
     try stderr.print("cat gps_data_file | zig-out/bin/watershedCore --database=/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg\n\n", .{});
 }
 
-fn printBeepyHelp() !void {
+fn printGuiHelp() !void {
     const stderr = std.io.getStdErr().writer();
-    try stderr.print("The watershedBeepy program TODO Describe the program.\n", .{});
+    try stderr.print("The watershedGui program TODO Describe the program.\n", .{});
     try stderr.print("TODO, describe how to use the watershedBeepy exe\n\n", .{});
     try stderr.print("Usage:\n", .{});
     try clap.help(stderr, clap.Help, &params, .{});
@@ -52,7 +52,7 @@ pub fn parseArgs(programType: ProgramType) !Args {
     if (res.args.help != 0 or res.args.database == null) {
         switch (programType) {
             .core => try printCoreHelp(),
-            .beepy => try printBeepyHelp(),
+            .gui => try printGuiHelp(),
         }
         return error.HelpPrinted;
     }

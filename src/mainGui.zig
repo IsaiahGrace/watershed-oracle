@@ -4,7 +4,7 @@ const std = @import("std");
 const watershed = @import("watershed.zig");
 
 pub fn main() !void {
-    const cliArgs = args.parseArgs(.beepy) catch |e| {
+    const cliArgs = args.parseArgs(.gui) catch |e| {
         switch (e) {
             error.HelpPrinted => return,
             else => return e,
