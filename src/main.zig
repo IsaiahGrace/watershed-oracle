@@ -30,7 +30,7 @@ pub fn main() !void {
     while (true) {
         const point = pointSrc.nextPoint() catch |e| {
             switch (e) {
-                error.NoMoreLocations => break,
+                error.NoMorePoints => break,
                 else => return e,
             }
         };

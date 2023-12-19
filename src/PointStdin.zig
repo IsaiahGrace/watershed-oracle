@@ -23,7 +23,7 @@ pub fn nextPoint(self: *PointSrc) !locationInterface.Point {
     self.stdinBuffer.clearRetainingCapacity();
     self.stdin.reader().streamUntilDelimiter(self.stdinBuffer.writer(), '\n', null) catch |e| {
         switch (e) {
-            error.EndOfStream => return error.NoMoreLocations,
+            error.EndOfStream => return error.NoMorePoints,
             else => return e,
         }
     };

@@ -99,11 +99,29 @@ pub fn build(b: *std.Build) !void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const clap = b.dependency("clap", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const options = b.addOptions();
+    options.addOption(DisplayMode, "displayMode", .none);
+    options.addOption(PointProviders, "pointProvider", .stdin);
+
     const watershedCoreNative = try addWatershedExe(b, "watershedOracle", target, optimize, .stdin, .none);
     _ = try addWatershedExe(b, "watershedGuiSim", target, optimize, .stdin, .windowed);
     _ = try addWatershedExe(b, "arm-watershedCore", targetArm, optimize, .stdin, .none);
     _ = try addWatershedExe(b, "arm-watershedGui", targetArm, optimize, .stdin, .framebuffer);
     _ = try addWatershedExe(b, "watershedFuzzer", target, optimize, .fuzzer, .none);
+
+    const pathUtil = b.addExecutable(.{
+        .name = "pathUtil",
+        .root_source_file = .{ .path = "src/pathUtil.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    pathUtil.addModule("clap", clap.module("clap"));
+    pathUtil.addOptions("config", options);
+    b.installArtifact(pathUtil);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
@@ -134,10 +152,6 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    const clap = b.dependency("clap", .{
-        .target = target,
-        .optimize = optimize,
-    });
     tests.addModule("clap", clap.module("clap"));
     tests.linkLibC();
     tests.linkSystemLibrary("geos_c");
@@ -155,9 +169,6 @@ pub fn build(b: *std.Build) !void {
             .rtextures = true,
         }),
     );
-    const options = b.addOptions();
-    options.addOption(DisplayMode, "displayMode", .none);
-    options.addOption(PointProviders, "pointProvider", .stdin);
     tests.addOptions("config", options);
 
     const run_core_tests = b.addRunArtifact(tests);
