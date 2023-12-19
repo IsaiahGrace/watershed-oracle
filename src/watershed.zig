@@ -7,6 +7,7 @@ const sqlite = @cImport(@cInclude("sqlite3.h"));
 const SqliteCtx = @import("sqliteCtx.zig").SqliteCtx;
 const sqliteErrors = @import("sqliteErrors.zig");
 const std = @import("std");
+const pointInterface = @import("pointInterface.zig");
 
 pub const Watershed = struct {
     huc: [16]u8,
@@ -175,6 +176,13 @@ pub const WatershedStack = struct {
         };
     }
 
+    pub fn update(self: *WatershedStack, newPoint: pointInterface.Point) !void {
+        switch (newPoint) {
+            .wkt => |wkt| try self.updateWKT(wkt),
+            .xy => |xy| try self.updateXY(xy.x, xy.y),
+        }
+    }
+
     pub fn updateWKT(self: *WatershedStack, newPoint: [*:0]const u8) !void {
         self.clearPoint();
 
@@ -183,17 +191,17 @@ pub const WatershedStack = struct {
 
         self.point = geos_c.GEOSWKTReader_read_r(self.gctx.handle, reader, newPoint);
         if (self.point == null) return error.updateWKT;
-        try self.update();
+        try self.updateStack();
     }
 
     pub fn updateXY(self: *WatershedStack, x: f64, y: f64) !void {
         self.clearPoint();
         self.point = geos_c.GEOSGeom_createPointFromXY_r(self.gctx.handle, x, y);
         if (self.point == null) return error.updateXY;
-        try self.update();
+        try self.updateStack();
     }
 
-    fn update(self: *WatershedStack) !void {
+    fn updateStack(self: *WatershedStack) !void {
         // The point has been updated, now re-validate the watershed stack.
         if (self.point == null) return error.updateNullPoint;
 

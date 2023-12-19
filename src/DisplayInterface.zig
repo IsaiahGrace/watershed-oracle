@@ -1,5 +1,8 @@
 const config = @import("config");
-const dummyDisplay = @import("dummyDisplay.zig");
-const realDisplay = @import("Display.zig");
+const displayNone = @import("DisplayNone.zig");
+const displayRaylib = @import("DisplayRaylib.zig");
 
-pub const Display = if (config.gui) realDisplay.Display else dummyDisplay.Display;
+pub const Display = switch (config.displayMode) {
+    .none => displayNone,
+    .windowed, .framebuffer => displayRaylib,
+};

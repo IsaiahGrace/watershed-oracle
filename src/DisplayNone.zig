@@ -1,14 +1,13 @@
 const std = @import("std");
 const watershed = @import("watershed.zig");
 
-// This dummy display is imported by watershed.zig if config.gui is false
+// This dummy display is imported by DisplayInterface.zig if config.gui is false
 // The Display struct below allows us to use the same code in watershed.zig for both Gui and Core binaries.
-
-// This is kinda like a compile time vtable :)
 
 pub const Display = @This();
 
-pub fn init() Display {
+pub fn init(allocator: std.mem.Allocator) Display {
+    _ = allocator;
     return Display{};
 }
 
