@@ -29,6 +29,9 @@ rng: std.rand.DefaultPrng,
 x: f64,
 y: f64,
 
+dx: f64,
+dy: f64,
+
 pub fn init(allocator: std.mem.Allocator) PointSrc {
     _ = allocator;
     var rng = std.rand.DefaultPrng.init(@intCast(std.time.timestamp()));
@@ -36,6 +39,8 @@ pub fn init(allocator: std.mem.Allocator) PointSrc {
         .rng = rng,
         .x = rng.random().float(f64) * (maxx - minx) + minx,
         .y = rng.random().float(f64) * (maxy - miny) + miny,
+        .dx = 0,
+        .dy = 0,
     };
 }
 
@@ -44,9 +49,11 @@ pub fn deinit(self: *PointSrc) void {
 }
 
 pub fn nextPoint(self: *PointSrc) !locationInterface.Point {
-    // The "+ 0.4" gives a slight bias for the point to drift in the NE direction.
+    // The "+ 0.1" gives a slight bias for the point to drift in the NE direction.
     // Hopefully this will help us travel to new places!
-    self.x += (self.rng.random().floatNorm(f64) + 0.4) * 0.005;
-    self.y += (self.rng.random().floatNorm(f64) + 0.4) * 0.005;
+    self.dx += (self.rng.random().floatNorm(f64) + 0.1) * 0.0001;
+    self.dy += (self.rng.random().floatNorm(f64) + 0.1) * 0.0001;
+    self.x += self.dx;
+    self.y += self.dy;
     return .{ .xy = .{ .x = self.x, .y = self.y } };
 }
