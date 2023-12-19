@@ -3,11 +3,11 @@ const Display = @import("DisplayInterface.zig").Display;
 const geos_c = @cImport(@cInclude("geos_c.h"));
 const GeosCtx = @import("geosCtx.zig").GeosCtx;
 const gpkg = @import("gpkg.zig");
+const Point = @import("pointInterface.zig").Point;
 const sqlite = @cImport(@cInclude("sqlite3.h"));
 const SqliteCtx = @import("sqliteCtx.zig").SqliteCtx;
 const sqliteErrors = @import("sqliteErrors.zig");
 const std = @import("std");
-const pointInterface = @import("pointInterface.zig");
 
 pub const Watershed = struct {
     huc: [16]u8,
@@ -176,7 +176,7 @@ pub const WatershedStack = struct {
         };
     }
 
-    pub fn update(self: *WatershedStack, newPoint: pointInterface.Point) !void {
+    pub fn update(self: *WatershedStack, newPoint: Point) !void {
         switch (newPoint) {
             .wkt => |wkt| try self.updateWKT(wkt),
             .xy => |xy| try self.updateXY(xy.x, xy.y),

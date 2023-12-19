@@ -1,6 +1,6 @@
 const clap = @import("clap");
-const std = @import("std");
 const config = @import("config");
+const std = @import("std");
 
 const Args = struct {
     skipHuc14and16: bool,
