@@ -32,7 +32,8 @@ y: f64,
 dx: f64,
 dy: f64,
 
-pub fn init(allocator: std.mem.Allocator) PointSrc {
+pub fn init(allocator: std.mem.Allocator, options: locationInterface.PointSrcOptions) PointSrc {
+    _ = options;
     _ = allocator;
     var rng = std.rand.DefaultPrng.init(@intCast(std.time.timestamp()));
     return PointSrc{
@@ -55,5 +56,5 @@ pub fn nextPoint(self: *PointSrc) !locationInterface.Point {
     self.dy += (self.rng.random().floatNorm(f64) + 0.1) * 0.0001;
     self.x += self.dx;
     self.y += self.dy;
-    return .{ .xy = .{ .x = self.x, .y = self.y } };
+    return .{ .location = .{ .xy = .{ .x = self.x, .y = self.y } } };
 }

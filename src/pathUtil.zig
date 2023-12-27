@@ -42,13 +42,13 @@ pub fn main() !void {
 
     var pointSrc: PointSources = pst: {
         if (res.args.gps != 0) {
-            break :pst .{ .gps = PointFuzzer.init(allocator) };
+            return error.NotYetImplemented;
         }
         if (res.args.fuzzer != 0) {
-            break :pst .{ .fuzzer = PointFuzzer.init(allocator) };
+            break :pst .{ .fuzzer = PointFuzzer.init(allocator, .{}) };
         }
         if (res.args.stdin != 0) {
-            break :pst .{ .stdin = PointStdin.init(allocator) };
+            break :pst .{ .stdin = PointStdin.init(allocator, .{}) };
         }
         try clap.help(stderr, clap.Help, &params, .{});
         return;
@@ -73,7 +73,7 @@ pub fn main() !void {
             }
         };
 
-        switch (point) {
+        switch (point.location) {
             .wkt => |wkt| try stdout.print("{s}\n", .{wkt}),
             .xy => |xy| try stdout.print("POINT ({d} {d})\n", .{ xy.x, xy.y }),
         }

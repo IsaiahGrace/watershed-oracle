@@ -32,17 +32,18 @@ pub const WatershedStack = struct {
     // these levels is almost always a waste of time. This switch just skips these two levels.
     skipHuc14and16: bool,
 
-    point: geos_c.GEOSGeom,
+    point: geos_c.GEOSGeom = null,
     pointBounds: Bounds,
+    requestId: u64 = 0,
 
-    huc2: ?Watershed,
-    huc4: ?Watershed,
-    huc6: ?Watershed,
-    huc8: ?Watershed,
-    huc10: ?Watershed,
-    huc12: ?Watershed,
-    huc14: ?Watershed,
-    huc16: ?Watershed,
+    huc2: ?Watershed = null,
+    huc4: ?Watershed = null,
+    huc6: ?Watershed = null,
+    huc8: ?Watershed = null,
+    huc10: ?Watershed = null,
+    huc12: ?Watershed = null,
+    huc14: ?Watershed = null,
+    huc16: ?Watershed = null,
 
     pub fn init(allocator: std.mem.Allocator, dsp: *Display, gpkgPath: []const u8, skipHuc14and16: bool) !WatershedStack {
         // We need to provide a null terminated path to SqliteCtx.init(), so we'll have to add that null byte here
@@ -63,21 +64,12 @@ pub const WatershedStack = struct {
             .gctx = geosContext,
             .dsp = dsp,
             .skipHuc14and16 = skipHuc14and16,
-            .point = null,
             .pointBounds = .{
                 .minX = std.math.floatMax(f64),
                 .maxX = std.math.floatMin(f64),
                 .minY = std.math.floatMax(f64),
                 .maxY = std.math.floatMin(f64),
             },
-            .huc2 = null,
-            .huc4 = null,
-            .huc6 = null,
-            .huc8 = null,
-            .huc10 = null,
-            .huc12 = null,
-            .huc14 = null,
-            .huc16 = null,
         };
     }
 
@@ -171,6 +163,8 @@ pub const WatershedStack = struct {
         var ws = std.json.writeStream(stdout, .{ .whitespace = .minified });
         defer ws.deinit();
         try ws.beginObject();
+        try ws.objectField("requestId");
+        try ws.write(self.requestId);
 
         if (self.point) |point| {
             var writer = geos_c.GEOSWKTWriter_create_r(self.gctx.handle);
@@ -279,7 +273,8 @@ pub const WatershedStack = struct {
     }
 
     pub fn update(self: *WatershedStack, newPoint: Point) !void {
-        switch (newPoint) {
+        self.requestId = newPoint.requestId;
+        switch (newPoint.location) {
             .wkt => |wkt| try self.updateWKT(wkt),
             .xy => |xy| try self.updateXY(xy.x, xy.y),
         }

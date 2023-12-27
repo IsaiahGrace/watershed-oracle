@@ -13,13 +13,23 @@ pub const PointXY = struct {
     y: f64,
 };
 
-pub const Point = union(PointTypes) {
+pub const PointLocation = union(PointTypes) {
     wkt: [*:0]u8,
     xy: PointXY,
+};
+
+/// The `requestId` field is passed through and used by other programs to identify the point data
+pub const Point = struct {
+    requestId: u64 = 0,
+    location: PointLocation,
 };
 
 pub const PointSrc = switch (config.pointProvider) {
     .stdin => PointStdin,
     .fuzzer => PointFuzzer,
     .gps => PointGPS,
+};
+
+pub const PointSrcOptions = struct {
+    json: bool = false,
 };

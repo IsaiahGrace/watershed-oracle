@@ -11,7 +11,7 @@ const Args = struct {
 const params = clap.parseParamsComptime(
     \\-h, --help             Display this help and exit.
     \\-d, --database <str>   Required. The full path to WBD_National_GPKG.gpkg. This path is given directly to sqlite3_open() and does not support the home directory shortcut '~/'.
-    \\-j, --json             Point data will be printed in JSON to stdout.
+    \\-j, --json             Stdin AND stdout data will be formatted with JSON. Stdin objects should have "longitude", "latitude", and "requestId" fields.
     \\-s, --skipHuc14and16   Disables searching in HUC levels 14 and 16. These levels are not defined for most of the US. Defaults to false.
 );
 

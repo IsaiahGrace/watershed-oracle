@@ -22,7 +22,7 @@ pub fn main() !void {
     var watershedStack = try watershed.WatershedStack.init(allocator, &dsp, cliArgs.databasePath, cliArgs.skipHuc14and16);
     defer watershedStack.deinit();
 
-    var pointSrc = PointSrc.init(allocator);
+    var pointSrc = PointSrc.init(allocator, .{ .json = cliArgs.json });
     defer pointSrc.deinit();
 
     // Process points from the pointSrc until there's nothing more to read.

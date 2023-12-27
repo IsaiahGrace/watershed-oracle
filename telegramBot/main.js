@@ -4,13 +4,6 @@ import makeLineIterator from './lineIterator.js';
 // replace the value below with the Telegram token you receive from @BotFather
 const token = 'REDACTED';
 
-function createPointKey(longitude, latitude) {
-    return [
-        longitude,
-        latitude
-    ].join(',');
-}
-
 // Create a bot that uses 'polling' to fetch new updates
 const bot = new TelegramBot(token, {
     polling: true
@@ -23,12 +16,15 @@ bot.on('message', (msg) => {
 });
 
 bot.on('location', (msg) => {
-    //console.log(msg);
     const chatId = msg.chat.id;
-    const key = createPointKey(msg.location.longitude, msg.location.latitude);
-    pointToChatIdMap.set(key, chatId);
     bot.sendMessage(chatId, 'Received your location, calculating your watershed!');
-    proc.stdin.write(`POINT(${msg.location.longitude} ${msg.location.latitude})\n`)
+    proc.stdin.write(JSON.stringify({
+        requestId: chatId,
+        longitude: msg.location.longitude,
+        latitude: msg.location.latitude,
+    }));
+    proc.stdin.write('\n');
+    proc.stdin.flush();
 });
 
 const proc = Bun.spawn(["../zig-out/bin/watershedOracle",
@@ -42,18 +38,13 @@ const proc = Bun.spawn(["../zig-out/bin/watershedOracle",
         console.log(exitCode);
         console.log(signalCode);
         console.log(error);
+        process.exit(1);
     },
 });
 
-let pointToChatIdMap = new Map();
-
 for await (let line of makeLineIterator(proc.stdout.getReader(), 1)) {
     const stack = JSON.parse(line);
-    const key = createPointKey(stack.point.longitude, stack.point.latitude);
-    const chatId = pointToChatIdMap.get(key);
-
-    if (chatId) {
-        bot.sendMessage(chatId, `Your point is in the following watersheds:
+    bot.sendMessage(stack.requestId, `Your point is in the following watersheds:
 ${stack.huc2  ? stack.huc2.name  : ""}
 ${stack.huc4  ? stack.huc4.name  : ""}
 ${stack.huc6  ? stack.huc6.name  : ""}
@@ -62,10 +53,4 @@ ${stack.huc10 ? stack.huc10.name : ""}
 ${stack.huc12 ? stack.huc12.name : ""}
 ${stack.huc14 ? stack.huc14.name : ""}
 ${stack.huc16 ? stack.huc16.name : ""}`);
-    } else {
-        console.log("Error, could not get chatId from pointToChatIdMap");
-        console.log(stack);
-        console.log(pointToChatIdMap);
-        console.log(key);
-    }
 }
