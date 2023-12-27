@@ -3,8 +3,8 @@ const config = @import("config");
 const std = @import("std");
 
 const Args = struct {
-    skipHuc14and16: bool,
     databasePath: []const u8,
+    skipHuc14and16: bool,
 };
 
 const params = clap.parseParamsComptime(
@@ -33,7 +33,7 @@ fn printHelp() !void {
     try clap.help(stderr, clap.Help, &params, .{});
     try stderr.print("\nExamples:\n", .{});
     try stderr.print("echo \"POINT(-70.386781360 43.5014404586)\" | zig-out/bin/watershedOracle --database=/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg\n", .{});
-    try stderr.print("cat gps_data_file | zig-out/bin/watershedCore --database=/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg\n\n", .{});
+    try stderr.print("cat gps_data_file | zig-out/bin/watershedOracle --database=/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg\n\n", .{});
 }
 
 pub fn parseArgs() !Args {
@@ -52,7 +52,7 @@ pub fn parseArgs() !Args {
     }
 
     return Args{
-        .skipHuc14and16 = if (res.args.skipHuc14and16 != 0) true else false,
         .databasePath = res.args.database.?,
+        .skipHuc14and16 = if (res.args.skipHuc14and16 != 0) true else false,
     };
 }
