@@ -127,7 +127,7 @@ pub const WatershedStack = struct {
         self.sctx.deinit();
     }
 
-    pub fn logPoint(self: *const WatershedStack) !void {
+    pub fn printPoint(self: *const WatershedStack) !void {
         const stdout_file = std.io.getStdOut().writer();
         var bw = std.io.bufferedWriter(stdout_file);
         const stdout = bw.writer();
@@ -146,7 +146,7 @@ pub const WatershedStack = struct {
         try bw.flush();
     }
 
-    pub fn logStack(self: *const WatershedStack) !void {
+    pub fn printStack(self: *const WatershedStack) !void {
         const stdout_file = std.io.getStdOut().writer();
         var bw = std.io.bufferedWriter(stdout_file);
         const stdout = bw.writer();
@@ -160,6 +160,108 @@ pub const WatershedStack = struct {
         if (self.huc12) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
         if (self.huc14) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
         if (self.huc16) |watershed| try stdout.print("{s} : {s}\n", .{ watershed.huc, watershed.name });
+        try bw.flush();
+    }
+
+    pub fn printJSON(self: *const WatershedStack) !void {
+        const stdout_file = std.io.getStdOut().writer();
+        var bw = std.io.bufferedWriter(stdout_file);
+        const stdout = bw.writer();
+
+        var ws = std.json.writeStream(stdout, .{ .whitespace = .minified });
+        defer ws.deinit();
+        try ws.beginObject();
+
+        if (self.point) |point| {
+            var writer = geos_c.GEOSWKTWriter_create_r(self.gctx.handle);
+            defer geos_c.GEOSWKTWriter_destroy_r(self.gctx.handle, writer);
+            const pointWKT = geos_c.GEOSWKTWriter_write_r(self.gctx.handle, writer, point);
+            defer geos_c.GEOSFree_r(self.gctx.handle, pointWKT);
+            try ws.objectField("point");
+            try ws.beginObject();
+            try ws.objectField("WKT");
+            try ws.write(@as([*:0]u8, @ptrCast(pointWKT)));
+            try ws.objectField("longitude");
+            try ws.write(self.pointBounds.minX);
+            try ws.objectField("latitude");
+            try ws.write(self.pointBounds.minY);
+            try ws.endObject();
+        }
+
+        if (self.huc2) |watershed| {
+            try ws.objectField("huc2");
+            try ws.beginObject();
+            try ws.objectField("name");
+            try ws.write(watershed.name);
+            try ws.objectField("huc");
+            try ws.write(watershed.huc[0..2]);
+            try ws.endObject();
+        }
+        if (self.huc4) |watershed| {
+            try ws.objectField("huc4");
+            try ws.beginObject();
+            try ws.objectField("name");
+            try ws.write(watershed.name);
+            try ws.objectField("huc");
+            try ws.write(watershed.huc[0..4]);
+            try ws.endObject();
+        }
+        if (self.huc6) |watershed| {
+            try ws.objectField("huc6");
+            try ws.beginObject();
+            try ws.objectField("name");
+            try ws.write(watershed.name);
+            try ws.objectField("huc");
+            try ws.write(watershed.huc[0..6]);
+            try ws.endObject();
+        }
+        if (self.huc8) |watershed| {
+            try ws.objectField("huc8");
+            try ws.beginObject();
+            try ws.objectField("name");
+            try ws.write(watershed.name);
+            try ws.objectField("huc");
+            try ws.write(watershed.huc[0..8]);
+            try ws.endObject();
+        }
+        if (self.huc10) |watershed| {
+            try ws.objectField("huc10");
+            try ws.beginObject();
+            try ws.objectField("name");
+            try ws.write(watershed.name);
+            try ws.objectField("huc");
+            try ws.write(watershed.huc[0..10]);
+            try ws.endObject();
+        }
+        if (self.huc12) |watershed| {
+            try ws.objectField("huc12");
+            try ws.beginObject();
+            try ws.objectField("name");
+            try ws.write(watershed.name);
+            try ws.objectField("huc");
+            try ws.write(watershed.huc[0..12]);
+            try ws.endObject();
+        }
+        if (self.huc14) |watershed| {
+            try ws.objectField("huc14");
+            try ws.beginObject();
+            try ws.objectField("name");
+            try ws.write(watershed.name);
+            try ws.objectField("huc");
+            try ws.write(watershed.huc[0..14]);
+            try ws.endObject();
+        }
+        if (self.huc16) |watershed| {
+            try ws.objectField("huc16");
+            try ws.beginObject();
+            try ws.objectField("name");
+            try ws.write(watershed.name);
+            try ws.objectField("huc");
+            try ws.write(watershed.huc[0..16]);
+            try ws.endObject();
+        }
+        try ws.endObject();
+        try stdout.print("\n", .{});
         try bw.flush();
     }
 

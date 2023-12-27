@@ -34,9 +34,15 @@ pub fn main() !void {
                 else => return e,
             }
         };
+
         try watershedStack.update(point);
-        try watershedStack.logPoint();
-        try watershedStack.logStack();
+
+        if (cliArgs.json) {
+            try watershedStack.printJSON();
+        } else {
+            try watershedStack.printPoint();
+            try watershedStack.printStack();
+        }
     }
 }
 

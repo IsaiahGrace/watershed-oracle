@@ -4,12 +4,14 @@ const std = @import("std");
 
 const Args = struct {
     databasePath: []const u8,
+    json: bool,
     skipHuc14and16: bool,
 };
 
 const params = clap.parseParamsComptime(
     \\-h, --help             Display this help and exit.
     \\-d, --database <str>   Required. The full path to WBD_National_GPKG.gpkg. This path is given directly to sqlite3_open() and does not support the home directory shortcut '~/'.
+    \\-j, --json             Point data will be printed in JSON to stdout.
     \\-s, --skipHuc14and16   Disables searching in HUC levels 14 and 16. These levels are not defined for most of the US. Defaults to false.
 );
 
@@ -53,6 +55,7 @@ pub fn parseArgs() !Args {
 
     return Args{
         .databasePath = res.args.database.?,
+        .json = if (res.args.json != 0) true else false,
         .skipHuc14and16 = if (res.args.skipHuc14and16 != 0) true else false,
     };
 }
