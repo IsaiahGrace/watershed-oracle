@@ -1,6 +1,9 @@
 const config = @import("config");
 const Display = @import("DisplayInterface.zig").Display;
-const geos_c = @cImport(@cInclude("geos_c.h"));
+const geos_c = @cImport({
+    @cDefine("GEOS_USE_ONLY_R_API", {});
+    @cInclude("geos_c.h");
+});
 const GeosCtx = @import("geosCtx.zig").GeosCtx;
 const gpkg = @import("gpkg.zig");
 const Point = @import("pointInterface.zig").Point;

@@ -1,4 +1,7 @@
-const geos_c = @cImport(@cInclude("geos_c.h"));
+const geos_c = @cImport({
+    @cDefine("GEOS_USE_ONLY_R_API", {});
+    @cInclude("geos_c.h");
+});
 const std = @import("std");
 const stdio = @cImport(@cInclude("stdio.h"));
 
