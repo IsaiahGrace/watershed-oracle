@@ -6,7 +6,7 @@ const geos_c = @cImport({
 });
 const GeosCtx = @import("geosCtx.zig").GeosCtx;
 const gpkg = @import("gpkg.zig");
-const Point = @import("pointInterface.zig").Point;
+const Point = @import("point/interface.zig").Point;
 const sqlite = @cImport(@cInclude("sqlite3.h"));
 const SqliteCtx = @import("sqliteCtx.zig").SqliteCtx;
 const sqliteErrors = @import("sqliteErrors.zig");

@@ -1,6 +1,6 @@
 const args = @import("args.zig");
 const Display = @import("DisplayInterface.zig").Display;
-const PointSrc = @import("pointInterface.zig").PointSrc;
+const PointSrc = @import("point/interface.zig").PointSrc;
 const std = @import("std");
 const watershed = @import("watershed.zig");
 
@@ -35,7 +35,15 @@ pub fn main() !void {
             }
         };
 
-        try watershedStack.update(point);
+        watershedStack.update(point) catch |e| {
+            switch (e) {
+                error.pointNotInDataset => {
+                    std.log.err("Point not it dataset! Ignoring!", .{});
+                    continue;
+                },
+                else => return e,
+            }
+        };
 
         if (cliArgs.json) {
             try watershedStack.printJSON();

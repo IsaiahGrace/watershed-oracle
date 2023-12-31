@@ -11,9 +11,10 @@ const armTargetTriplet = "arm-linux-gnueabihf";
 const armCpuFeatures = "cortex_a53";
 
 const PointProviders = enum {
-    stdin,
     fuzzer,
     gps,
+    scatter,
+    stdin,
 };
 
 const DisplayMode = enum {

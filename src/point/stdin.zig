@@ -1,4 +1,4 @@
-const locationInterface = @import("pointInterface.zig");
+const locationInterface = @import("interface.zig");
 const std = @import("std");
 
 pub const PointSrc = @This();

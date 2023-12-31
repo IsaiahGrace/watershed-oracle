@@ -1,7 +1,4 @@
 const config = @import("config");
-const PointFuzzer = @import("PointFuzzer.zig").PointSrc;
-const PointGPS = @import("PointGPS.zig").PointSrc;
-const PointStdin = @import("PointStdin.zig").PointSrc;
 
 pub const PointTypes = enum {
     wkt,
@@ -25,9 +22,10 @@ pub const Point = struct {
 };
 
 pub const PointSrc = switch (config.pointProvider) {
-    .stdin => PointStdin,
-    .fuzzer => PointFuzzer,
-    .gps => PointGPS,
+    .stdin => @import("stdin.zig"),
+    .fuzzer => @import("fuzzer.zig"),
+    .gps => @import("gps.zig"),
+    .scatter => @import("scatter.zig"),
 };
 
 pub const PointSrcOptions = struct {

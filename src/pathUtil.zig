@@ -1,14 +1,15 @@
 const clap = @import("clap");
 const std = @import("std");
 const config = @import("config");
-const PointFuzzer = @import("PointFuzzer.zig");
-//const PointGPS = @import("PointGPS.zig");
-const PointStdin = @import("PointStdin.zig");
+const PointFuzzer = @import("point/fuzzer.zig");
+const PointStdin = @import("point/stdin.zig");
+const PointScatter = @import("point/scatter.zig");
 
 const PointSources = union(config.@"build.PointProviders") {
-    stdin: PointStdin,
     fuzzer: PointFuzzer,
     gps: PointFuzzer,
+    scatter: PointScatter,
+    stdin: PointStdin,
 };
 
 const params = clap.parseParamsComptime(
@@ -16,7 +17,8 @@ const params = clap.parseParamsComptime(
     \\-g, --gps               Collect point data from the GPS.
     \\-f, --fuzzer            Collect point data from the fuzzer.
     \\-s, --stdin             Collect point data from stdin.
-    \\-n, --numPoints <usize> Collect only numPoints points. 
+    \\-c, --scatter           Randomly create point data.
+    \\-n, --numPoints <usize> Collect only numPoints points.
 );
 
 pub fn main() !void {
@@ -49,6 +51,9 @@ pub fn main() !void {
         }
         if (res.args.stdin != 0) {
             break :pst .{ .stdin = PointStdin.init(allocator, .{}) };
+        }
+        if (res.args.scatter != 0) {
+            break :pst .{ .scatter = PointScatter.init(allocator, .{}) };
         }
         try clap.help(stderr, clap.Help, &params, .{});
         return;

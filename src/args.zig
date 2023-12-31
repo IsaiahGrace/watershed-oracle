@@ -19,6 +19,7 @@ const pointProviderText = switch (config.pointProvider) {
     .stdin => "This program reads point data in the form of Well Known Text (WKT) from stdin. One point per line. WKT should be in the form POINT(x y).",
     .fuzzer => "This program randomly generates a starting point in the Ohio or Tennessee watersheds and randomly moves the point in a somewhat NE direction.",
     .gps => "This program uses GPS position data to determine the watershed.",
+    .scatter => "This program randomly generates points. Most are inside the US, but some are not.",
 };
 
 const displayModeText = switch (config.displayMode) {
