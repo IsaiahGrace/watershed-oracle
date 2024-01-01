@@ -6,6 +6,7 @@ pub const PointSrc = @This();
 pub fn init(allocator: std.mem.Allocator, options: locationInterface.PointSrcOptions) PointSrc {
     _ = options;
     _ = allocator;
+    return PointSrc{};
 }
 
 pub fn deinit(self: *PointSrc) void {
@@ -14,5 +15,5 @@ pub fn deinit(self: *PointSrc) void {
 
 pub fn nextPoint(self: *PointSrc) !locationInterface.Point {
     _ = self;
-    return .{ .xy = .{ .x = 0, .y = 0 } };
+    return .{ .location = .{ .xy = .{ .x = 0, .y = 0 } } };
 }

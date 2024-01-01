@@ -81,6 +81,32 @@ fn addWatershedExe(
     return exe;
 }
 
+fn addPathUtilExe(
+    b: *std.Build,
+    binaryName: []const u8,
+    target: std.zig.CrossTarget,
+    optimize: std.builtin.OptimizeMode,
+) !*std.Build.CompileStep {
+    const clap = b.dependency("clap", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const options = b.addOptions();
+    options.addOption(DisplayMode, "displayMode", .none);
+    options.addOption(PointProviders, "pointProvider", .stdin);
+
+    const pathUtil = b.addExecutable(.{
+        .name = binaryName,
+        .root_source_file = .{ .path = "src/pathUtil.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    pathUtil.addModule("clap", clap.module("clap"));
+    pathUtil.addOptions("config", options);
+    b.installArtifact(pathUtil);
+    return pathUtil;
+}
+
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
@@ -100,29 +126,19 @@ pub fn build(b: *std.Build) !void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const clap = b.dependency("clap", .{
-        .target = target,
-        .optimize = optimize,
-    });
     const options = b.addOptions();
     options.addOption(DisplayMode, "displayMode", .none);
     options.addOption(PointProviders, "pointProvider", .stdin);
 
     const watershedCoreNative = try addWatershedExe(b, "watershedOracle", target, optimize, .stdin, .none);
-    _ = try addWatershedExe(b, "watershedGuiSim", target, optimize, .stdin, .windowed);
     _ = try addWatershedExe(b, "arm-watershedCore", targetArm, optimize, .stdin, .none);
     _ = try addWatershedExe(b, "arm-watershedGui", targetArm, optimize, .stdin, .framebuffer);
     _ = try addWatershedExe(b, "watershedFuzzer", target, optimize, .fuzzer, .none);
+    _ = try addWatershedExe(b, "watershedGuiSim", target, optimize, .stdin, .windowed);
+    _ = try addWatershedExe(b, "watershedGPSMock", target, optimize, .gps, .none);
 
-    const pathUtil = b.addExecutable(.{
-        .name = "pathUtil",
-        .root_source_file = .{ .path = "src/pathUtil.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    pathUtil.addModule("clap", clap.module("clap"));
-    pathUtil.addOptions("config", options);
-    b.installArtifact(pathUtil);
+    _ = try addPathUtilExe(b, "arm-pathUtil", targetArm, optimize);
+    _ = try addPathUtilExe(b, "pathUtil", target, optimize);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
@@ -147,7 +163,13 @@ pub fn build(b: *std.Build) !void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
+    // TESTS:
+
     // Because we have two top level files, we'll compile two sets of unit tests
+    const clap = b.dependency("clap", .{
+        .target = target,
+        .optimize = optimize,
+    });
     const tests = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,

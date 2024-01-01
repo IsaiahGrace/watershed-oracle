@@ -37,7 +37,7 @@ pub const WatershedStack = struct {
 
     point: geos_c.GEOSGeom = null,
     pointBounds: Bounds,
-    requestId: u64 = 0,
+    requestId: i64 = 0,
 
     huc2: ?Watershed = null,
     huc4: ?Watershed = null,

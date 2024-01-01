@@ -22,7 +22,7 @@ pub fn deinit(self: *PointSrc) void {
 }
 
 const PointJson = struct {
-    requestId: u64 = 0,
+    requestId: i64 = 0,
     longitude: f64,
     latitude: f64,
 };

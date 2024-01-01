@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const config = @import("config");
 
 pub const PointTypes = enum {
@@ -17,14 +18,14 @@ pub const PointLocation = union(PointTypes) {
 
 /// The `requestId` field is passed through and used by other programs to identify the point data
 pub const Point = struct {
-    requestId: u64 = 0,
+    requestId: i64 = 0,
     location: PointLocation,
 };
 
 pub const PointSrc = switch (config.pointProvider) {
     .stdin => @import("stdin.zig"),
     .fuzzer => @import("fuzzer.zig"),
-    .gps => @import("gps.zig"),
+    .gps => if (builtin.cpu.arch == .arm) @import("gps.zig") else @import("gpsMock.zig"),
     .scatter => @import("scatter.zig"),
 };
 

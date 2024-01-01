@@ -1,13 +1,15 @@
+const builtin = @import("builtin");
 const clap = @import("clap");
-const std = @import("std");
 const config = @import("config");
 const PointFuzzer = @import("point/fuzzer.zig");
-const PointStdin = @import("point/stdin.zig");
+const PointGps = if (builtin.target.cpu.arch == .arm) @import("point/gps.zig") else @import("point/gpsMock.zig");
 const PointScatter = @import("point/scatter.zig");
+const PointStdin = @import("point/stdin.zig");
+const std = @import("std");
 
 const PointSources = union(config.@"build.PointProviders") {
     fuzzer: PointFuzzer,
-    gps: PointFuzzer,
+    gps: PointGps,
     scatter: PointScatter,
     stdin: PointStdin,
 };
@@ -44,7 +46,7 @@ pub fn main() !void {
 
     var pointSrc: PointSources = pst: {
         if (res.args.gps != 0) {
-            return error.NotYetImplemented;
+            break :pst .{ .gps = PointGps.init(allocator, .{}) };
         }
         if (res.args.fuzzer != 0) {
             break :pst .{ .fuzzer = PointFuzzer.init(allocator, .{}) };
@@ -66,7 +68,7 @@ pub fn main() !void {
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
-    const numPoints: usize = res.args.numPoints orelse std.math.maxInt(i64);
+    const numPoints: usize = res.args.numPoints orelse std.math.maxInt(usize);
     var n: usize = 0;
     while (n <= numPoints) : (n += 1) {
         const point = switch (pointSrc) {
