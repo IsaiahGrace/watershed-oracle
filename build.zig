@@ -28,6 +28,7 @@ fn addWatershedExe(
     binaryName: []const u8,
     target: std.zig.CrossTarget,
     optimize: std.builtin.OptimizeMode,
+    clap: *std.build.Dependency,
     pointProvider: PointProviders,
     displayMode: DisplayMode,
 ) !*std.Build.CompileStep {
@@ -42,6 +43,7 @@ fn addWatershedExe(
         exe.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc" });
         exe.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf" });
         exe.addLibraryPath(.{ .path = "lib/arm-linux-gnueabihf/lib" });
+        exe.linkSystemLibrary("pigpiod_if2");
     }
 
     if (displayMode != .none) {
@@ -51,11 +53,6 @@ fn addWatershedExe(
     exe.linkLibC();
     exe.linkSystemLibrary("geos_c");
     exe.linkSystemLibrary("sqlite3");
-
-    const clap = b.dependency("clap", .{
-        .target = target,
-        .optimize = optimize,
-    });
     exe.addModule("clap", clap.module("clap"));
 
     const options = b.addOptions();
@@ -86,11 +83,8 @@ fn addPathUtilExe(
     binaryName: []const u8,
     target: std.zig.CrossTarget,
     optimize: std.builtin.OptimizeMode,
+    clap: *std.build.Dependency,
 ) !*std.Build.CompileStep {
-    const clap = b.dependency("clap", .{
-        .target = target,
-        .optimize = optimize,
-    });
     const options = b.addOptions();
     options.addOption(DisplayMode, "displayMode", .none);
     options.addOption(PointProviders, "pointProvider", .stdin);
@@ -101,6 +95,15 @@ fn addPathUtilExe(
         .target = target,
         .optimize = optimize,
     });
+
+    if (target.getCpuArch() == .arm) {
+        pathUtil.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc" });
+        pathUtil.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf" });
+        pathUtil.addLibraryPath(.{ .path = "lib/arm-linux-gnueabihf/lib" });
+        pathUtil.linkLibC();
+        pathUtil.linkSystemLibrary("pigpiod_if2");
+    }
+
     pathUtil.addModule("clap", clap.module("clap"));
     pathUtil.addOptions("config", options);
     b.installArtifact(pathUtil);
@@ -126,50 +129,22 @@ pub fn build(b: *std.Build) !void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const options = b.addOptions();
-    options.addOption(DisplayMode, "displayMode", .none);
-    options.addOption(PointProviders, "pointProvider", .stdin);
+    const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
+    const clapArm = b.dependency("clap", .{ .target = targetArm, .optimize = optimize });
 
-    const watershedCoreNative = try addWatershedExe(b, "watershedOracle", target, optimize, .stdin, .none);
-    _ = try addWatershedExe(b, "arm-watershedCore", targetArm, optimize, .stdin, .none);
-    _ = try addWatershedExe(b, "arm-watershedGui", targetArm, optimize, .stdin, .framebuffer);
-    _ = try addWatershedExe(b, "watershedFuzzer", target, optimize, .fuzzer, .none);
-    _ = try addWatershedExe(b, "watershedGuiSim", target, optimize, .stdin, .windowed);
-    _ = try addWatershedExe(b, "watershedGPSMock", target, optimize, .gps, .none);
+    _ = try addWatershedExe(b, "arm-watershedCore", targetArm, optimize, clapArm, .stdin, .none);
+    _ = try addWatershedExe(b, "arm-watershedGui", targetArm, optimize, clapArm, .stdin, .framebuffer);
 
-    _ = try addPathUtilExe(b, "arm-pathUtil", targetArm, optimize);
-    _ = try addPathUtilExe(b, "pathUtil", target, optimize);
+    _ = try addWatershedExe(b, "watershedOracle", target, optimize, clap, .stdin, .none);
+    _ = try addWatershedExe(b, "watershedFuzzer", target, optimize, clap, .fuzzer, .none);
+    _ = try addWatershedExe(b, "watershedGuiSim", target, optimize, clap, .stdin, .windowed);
+    _ = try addWatershedExe(b, "watershedGPSMock", target, optimize, clap, .gps, .none);
 
-    // This *creates* a Run step in the build graph, to be executed when another
-    // step is evaluated that depends on it. The next line below will establish
-    // such a dependency.
-    const run_cmd = b.addRunArtifact(watershedCoreNative);
-
-    // By making the run step depend on the install step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
-    // This is not necessary, however, if the application depends on other installed
-    // files, this ensures they will be present and in the expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    // This creates a build step. It will be visible in the `zig build --help` menu,
-    // and can be selected like this: `zig build run`
-    // This will evaluate the `run` step rather than the default, which is "install".
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    _ = try addPathUtilExe(b, "arm-pathUtil", targetArm, optimize, clapArm);
+    _ = try addPathUtilExe(b, "pathUtil", target, optimize, clap);
 
     // TESTS:
 
-    // Because we have two top level files, we'll compile two sets of unit tests
-    const clap = b.dependency("clap", .{
-        .target = target,
-        .optimize = optimize,
-    });
     const tests = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
@@ -192,6 +167,9 @@ pub fn build(b: *std.Build) !void {
             .rtextures = true,
         }),
     );
+    const options = b.addOptions();
+    options.addOption(DisplayMode, "displayMode", .none);
+    options.addOption(PointProviders, "pointProvider", .stdin);
     tests.addOptions("config", options);
 
     const run_core_tests = b.addRunArtifact(tests);

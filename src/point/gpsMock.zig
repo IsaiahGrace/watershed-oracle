@@ -41,7 +41,7 @@ pub fn nextPoint(self: *PointSrc) !locationInterface.Point {
                 else => return e,
             }
         };
-        nmea.logSentence(sentence);
+        // nmea.logSentence(sentence);
         if (nmea.extractPoint(sentence)) |point| {
             return point;
         }

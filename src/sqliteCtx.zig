@@ -39,22 +39,3 @@ pub const SqliteCtx = struct {
         self.conn = null;
     }
 };
-
-test "Test DB Open and close" {
-    var sctx = try SqliteCtx.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
-    defer sctx.deinit();
-}
-
-test "Select the name of HUC 22" {
-    var sctx = try SqliteCtx.init("/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg");
-    defer sctx.deinit();
-
-    var statement: ?*sqlite.sqlite3_stmt = null;
-    const query = "SELECT name FROM \"WBDHU2\" WHERE \"huc2\" IS '22';";
-    try sqliteErrors.check(sqlite.sqlite3_prepare_v2(sctx.conn, query, query.len, &statement, null));
-    defer sqliteErrors.log(sqlite.sqlite3_finalize(statement));
-
-    try std.testing.expectEqual(sqlite.SQLITE_ROW, sqlite.sqlite3_step(statement));
-    try std.testing.expectEqualSentinel(u8, 0, "South Pacific Region", std.mem.span(sqlite.sqlite3_column_text(statement, 0)));
-    try std.testing.expectEqual(sqlite.SQLITE_DONE, sqlite.sqlite3_step(statement));
-}

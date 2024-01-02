@@ -10,7 +10,10 @@ pub fn extractPoint(sentence: Sentence) ?interface.Point {
     var lon: ?f64 = null;
     var lat: ?f64 = null;
     switch (sentence) {
-        // .GGA =>
+        .GGA => |gga| {
+            lon = gga.longitude;
+            lat = gga.latitude;
+        },
         .RMC => |rmc| {
             lon = rmc.longitude;
             lat = rmc.latitude;
@@ -60,7 +63,8 @@ fn validateChecksum(input: []const u8) !void {
     }
 
     if (calculatedChecksum != checksum) {
-        std.log.err("Checksum invalid: {s} | given: {d} != calculated: {d}", .{ input, checksum, calculatedChecksum });
+        std.log.err("Invalid checksum: {s}", .{input});
+        std.log.err("given: {d} != calculated: {d}", .{ checksum, calculatedChecksum });
         return error.invalidNMEA;
     }
 }
@@ -111,8 +115,29 @@ fn parseGBS(msg: []const u8) !Sentence {
 }
 
 fn parseGGA(msg: []const u8) !Sentence {
-    _ = msg;
-    return Sentence{ .GGA = .{} };
+    var splits = std.mem.splitScalar(u8, msg, ',');
+    const time = try parseUTC(splits.next().?);
+    const latitude = try parseLatLon(splits.next().?, splits.next().?);
+    const longitude = try parseLatLon(splits.next().?, splits.next().?);
+    const quality = splits.next().?;
+    const numSatUsed = try std.fmt.parseUnsigned(u8, splits.next().?, 10);
+    const hdop = std.fmt.parseFloat(f32, splits.next().?) catch null;
+    const altitude = std.fmt.parseFloat(f32, splits.next().?) catch null;
+    _ = splits.next().?;
+    const seperation = std.fmt.parseFloat(f32, splits.next().?) catch null;
+    _ = splits.next().?;
+    return Sentence{
+        .GGA = .{
+            .time = time,
+            .latitude = latitude,
+            .longitude = longitude,
+            .quality = quality[0],
+            .numSatUsed = numSatUsed,
+            .hdop = hdop,
+            .altitude = altitude,
+            .seperation = seperation,
+        },
+    };
 }
 
 fn parseGLL(msg: []const u8) !Sentence {
@@ -126,8 +151,15 @@ fn parseGSA(msg: []const u8) !Sentence {
 }
 
 fn parseGSV(msg: []const u8) !Sentence {
-    _ = msg;
-    return Sentence{ .GSV = .{} };
+    var splits = std.mem.splitScalar(u8, msg, ',');
+    _ = splits.next().?;
+    _ = splits.next().?;
+    const totalNumSat = try std.fmt.parseUnsigned(u16, splits.next().?, 10);
+    return Sentence{
+        .GSV = .{
+            .totalNumSat = totalNumSat,
+        },
+    };
 }
 
 fn parseRMC(msg: []const u8) !Sentence {
@@ -169,13 +201,16 @@ fn parseVTG(msg: []const u8) !Sentence {
 /// Takes a string representation of lat or lon, and a direction,
 /// either N/S or E/W. and returns the signed float.
 /// Returns null if either slices are empty.
-/// `mag` is in the format "dddmm.mmmmmm"
+/// `mag` (magnitude) is in the format:
+/// latitudes: "dddmm.mmmmmm"
+/// longitudes: "ddmm.mmmmmm"
 /// "dd" is degrees: 00 - 90
 /// "mm" in minutes: 00 - 59
 /// mmmmmm is decimal fraction of minutes (variable length, 4 to 6 digits)
 fn parseLatLon(mag: []const u8, dir: []const u8) !?f64 {
     if (dir.len == 0) return null;
     if (mag.len == 0) return null;
+    if (dir.len > 1) return error.invalidNMEA;
     if (mag.len < 9) return error.invalidNMEA;
     const i = std.mem.indexOfScalar(u8, mag, '.') orelse return error.invalidNMEA;
     const degrees = try std.fmt.parseFloat(f64, mag[0 .. i - 2]);
@@ -223,26 +258,24 @@ const Date = struct {
 };
 
 pub const DTM = struct {};
-
 pub const GBS = struct {};
 
 pub const GGA = struct {
-    // time: UTC,
-    // latitude: f64,
-    // longitude: f64,
-    // quality: u8,
-    // numSatUsed: u8,
-    // hdop: f32,
-    // altitude: f32,
-    // seperation: f32,
+    time: UTC,
+    latitude: ?f64,
+    longitude: ?f64,
+    quality: u8,
+    numSatUsed: u8,
+    hdop: ?f32,
+    altitude: ?f32,
+    seperation: ?f32,
 };
 
 pub const GLL = struct {};
-
 pub const GSA = struct {};
 
 pub const GSV = struct {
-    //    totalNumSat: u16,
+    totalNumSat: u16,
 };
 
 pub const RMC = struct {
@@ -258,7 +291,6 @@ pub const RMC = struct {
 };
 
 pub const TXT = struct {};
-
 pub const VTG = struct {};
 
 pub const Sentence = union(SentenceFormatter) {
@@ -287,45 +319,85 @@ pub const SentenceFormatter = enum {
 
 pub fn logSentence(sentence: Sentence) void {
     switch (sentence) {
+        .GGA => |gga| logGGA(gga),
+        .GSV => |gsv| logGSV(gsv),
         .RMC => |rmc| logRMC(rmc),
-        else => {}, // std.log.info("{s} parsed.", .{@tagName(sentence)}),
+        else => std.log.info("{s} parsed.", .{@tagName(sentence)}),
     }
 }
 
+fn logGGA(gga: GGA) void {
+    if (gga.longitude) |lon| {
+        if (gga.latitude) |lat| {
+            std.log.info("GGA {d}/{d}/{d} @ {d}:{:0>2}:{d}.{d} : ({d} {d})", .{
+                gga.date.month,
+                gga.date.day,
+                gga.date.year,
+                gga.time.hours,
+                gga.time.hours,
+                gga.time.seconds,
+                gga.time.miliseconds,
+                lon,
+                lat,
+            });
+            return;
+        }
+    }
+    std.log.info("GGA: no position data.");
+}
+
+fn logGSV(gsv: GSV) void {
+    std.log.info("GSV: Satilites in view: {d}", .{gsv.totalNumSat});
+}
+
 fn logRMC(rmc: RMC) void {
-    if (rmc.status == 'V') return;
-    std.log.info("RMC message:", .{});
-    std.log.info("time: {d}:{:0>2}:{d}.{d}", .{ rmc.time.hours, rmc.time.hours, rmc.time.seconds, rmc.time.miliseconds });
-    std.log.info("date: {d}/{d}/{d}", .{ rmc.date.month, rmc.date.day, rmc.date.year });
-    switch (rmc.status) {
-        'A' => std.log.info("data valid", .{}),
-        'V' => std.log.info("data invalid", .{}),
-        'D' => std.log.info("differential mode", .{}),
-        else => unreachable,
+    if (rmc.status == 'V') {
+        std.log.info("RMC: no position data.");
+    } else {
+        std.log.info("RMC: {d}/{d}/{d} @ {d}:{:0>2}:{d}.{d} : ({d} {d})", .{
+            rmc.date.month,
+            rmc.date.day,
+            rmc.date.year,
+            rmc.time.hours,
+            rmc.time.hours,
+            rmc.time.seconds,
+            rmc.time.miliseconds,
+            rmc.longitude.?,
+            rmc.latitude.?,
+        });
     }
-    if (rmc.navStatus) |navStatus| {
-        switch (navStatus) {
-            'S' => std.log.info("Navigational Status: Safe", .{}),
-            'C' => std.log.info("Navigational Status: Caution", .{}),
-            'U' => std.log.info("Navigational Status: Unsafe", .{}),
-            'V' => std.log.info("Navigational Status: Navigational status not valid. Equipment is not providing navigational status indication.", .{}),
-            else => unreachable,
-        }
-    }
-    if (rmc.latitude) |lat| std.log.info("latitude: {d}", .{lat});
-    if (rmc.longitude) |lon| std.log.info("longitude: {d}", .{lon});
-    std.log.info("speed: {d}", .{rmc.speed});
-    std.log.info("course: {d}", .{rmc.course});
-    if (rmc.mode) |mode| {
-        switch (mode) {
-            'A' => std.log.info("Mode: Autonomous mode. Satellite system used in non-differential mode in position fix", .{}),
-            'D' => std.log.info("Mode: Differential mode. Satellite system used in differential mode in position fix. Corrections from ground stations or Satellite Based Augmentation System (SBAS)", .{}),
-            'E' => std.log.info("Mode: Estimated (dead reckoning) mode", .{}),
-            'F' => std.log.info("Mode: Float RTK. Satellite system used in RTK mode with floating integers", .{}),
-            'M' => std.log.info("Mode: Manual input mode", .{}),
-            'N' => std.log.info("Mode: No fix. Satellite system not used in position fix, or fix not valid", .{}),
-            'R' => std.log.info("Mode: Real Time Kinematic (RTK). Satellite system used in RTK mode with fixed integers", .{}),
-            else => unreachable,
-        }
-    }
+    // std.log.info("RMC message:", .{});
+    // std.log.info("time: {d}:{:0>2}:{d}.{d}", .{ rmc.time.hours, rmc.time.hours, rmc.time.seconds, rmc.time.miliseconds });
+    // std.log.info("date: {d}/{d}/{d}", .{ rmc.date.month, rmc.date.day, rmc.date.year });
+    // switch (rmc.status) {
+    //     'A' => std.log.info("data valid", .{}),
+    //     'V' => std.log.info("data invalid", .{}),
+    //     'D' => std.log.info("differential mode", .{}),
+    //     else => unreachable,
+    // }
+    // if (rmc.navStatus) |navStatus| {
+    //     switch (navStatus) {
+    //         'S' => std.log.info("Navigational Status: Safe", .{}),
+    //         'C' => std.log.info("Navigational Status: Caution", .{}),
+    //         'U' => std.log.info("Navigational Status: Unsafe", .{}),
+    //         'V' => std.log.info("Navigational Status: Navigational status not valid. Equipment is not providing navigational status indication.", .{}),
+    //         else => unreachable,
+    //     }
+    // }
+    // if (rmc.latitude) |lat| std.log.info("latitude: {d}", .{lat});
+    // if (rmc.longitude) |lon| std.log.info("longitude: {d}", .{lon});
+    // std.log.info("speed: {d}", .{rmc.speed});
+    // std.log.info("course: {d}", .{rmc.course});
+    // if (rmc.mode) |mode| {
+    //     switch (mode) {
+    //         'A' => std.log.info("Mode: Autonomous mode. Satellite system used in non-differential mode in position fix", .{}),
+    //         'D' => std.log.info("Mode: Differential mode. Satellite system used in differential mode in position fix. Corrections from ground stations or Satellite Based Augmentation System (SBAS)", .{}),
+    //         'E' => std.log.info("Mode: Estimated (dead reckoning) mode", .{}),
+    //         'F' => std.log.info("Mode: Float RTK. Satellite system used in RTK mode with floating integers", .{}),
+    //         'M' => std.log.info("Mode: Manual input mode", .{}),
+    //         'N' => std.log.info("Mode: No fix. Satellite system not used in position fix, or fix not valid", .{}),
+    //         'R' => std.log.info("Mode: Real Time Kinematic (RTK). Satellite system used in RTK mode with fixed integers", .{}),
+    //         else => unreachable,
+    //     }
+    // }
 }
