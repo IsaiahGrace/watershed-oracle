@@ -6,31 +6,29 @@ const watershed = @import("watershed.zig");
 
 pub const Display = @This();
 
-pub fn init(allocator: std.mem.Allocator) Display {
+pub fn init(allocator: std.mem.Allocator, watershedStack: *const watershed.WatershedStack) Display {
+    _ = watershedStack;
     _ = allocator;
-    return Display{};
+    return .{};
 }
 
 pub fn deinit(self: *Display) void {
     _ = self;
 }
 
-pub fn drawSplash(self: *const Display) void {
+pub fn setSatilitesInView(self: *Display, totalNumSat: u16) !void {
+    _ = totalNumSat;
     _ = self;
 }
 
-fn drawWatershed(self: *Display, wshed: *watershed.Watershed, posY: c_int) !void {
-    _ = posY;
-    _ = wshed;
+pub fn drawSplash(self: *Display) !void {
     _ = self;
 }
 
-fn drawCalculating(self: *Display, posY: c_int) void {
-    _ = posY;
+pub fn drawWatershedStack(self: *Display) !void {
     _ = self;
 }
 
-pub fn drawWatershedStack(self: *Display, watershedStack: *watershed.WatershedStack) !void {
-    _ = watershedStack;
+pub fn draw(self: *Display) !void {
     _ = self;
 }

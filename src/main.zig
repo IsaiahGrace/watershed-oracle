@@ -16,13 +16,14 @@ pub fn main() !void {
     defer if (gpa.deinit() == .leak) std.log.err("GPA detected a leak!", .{});
     const allocator: std.mem.Allocator = gpa.allocator();
 
-    var dsp = Display.init(allocator);
-    defer dsp.deinit();
-
-    var watershedStack = try watershed.WatershedStack.init(allocator, &dsp, cliArgs.databasePath, cliArgs.skipHuc14and16);
+    var watershedStack = try watershed.WatershedStack.init(allocator, cliArgs.databasePath, cliArgs.skipHuc14and16);
     defer watershedStack.deinit();
 
-    var pointSrc = PointSrc.init(allocator, .{ .json = cliArgs.json });
+    var dsp = Display.init(allocator, &watershedStack);
+    defer dsp.deinit();
+    try dsp.drawSplash();
+
+    var pointSrc = PointSrc.init(allocator, .{ .json = cliArgs.json, .display = &dsp });
     defer pointSrc.deinit();
 
     // Process points from the pointSrc until there's nothing more to read.
@@ -51,6 +52,8 @@ pub fn main() !void {
             try watershedStack.printPoint();
             try watershedStack.printStack();
         }
+
+        try dsp.drawWatershedStack();
     }
 }
 

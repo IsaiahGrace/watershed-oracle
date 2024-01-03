@@ -329,10 +329,7 @@ pub fn logSentence(sentence: Sentence) void {
 fn logGGA(gga: GGA) void {
     if (gga.longitude) |lon| {
         if (gga.latitude) |lat| {
-            std.log.info("GGA {d}/{d}/{d} @ {d}:{:0>2}:{d}.{d} : ({d} {d})", .{
-                gga.date.month,
-                gga.date.day,
-                gga.date.year,
+            std.log.info("GGA {d}:{:0>2}:{d}.{d} : ({d} {d})", .{
                 gga.time.hours,
                 gga.time.hours,
                 gga.time.seconds,
@@ -343,7 +340,7 @@ fn logGGA(gga: GGA) void {
             return;
         }
     }
-    std.log.info("GGA: no position data.");
+    std.log.info("GGA: no position data.", .{});
 }
 
 fn logGSV(gsv: GSV) void {
@@ -352,7 +349,7 @@ fn logGSV(gsv: GSV) void {
 
 fn logRMC(rmc: RMC) void {
     if (rmc.status == 'V') {
-        std.log.info("RMC: no position data.");
+        std.log.info("RMC: no position data.", .{});
     } else {
         std.log.info("RMC: {d}/{d}/{d} @ {d}:{:0>2}:{d}.{d} : ({d} {d})", .{
             rmc.date.month,

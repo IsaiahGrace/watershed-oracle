@@ -10,6 +10,7 @@ const std = @import("std");
 const PointSources = union(config.@"build.PointProviders") {
     fuzzer: PointFuzzer,
     gps: PointGps,
+    gpsMock: PointGps,
     scatter: PointScatter,
     stdin: PointStdin,
 };

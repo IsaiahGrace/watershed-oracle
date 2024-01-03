@@ -1,22 +1,24 @@
-const locationInterface = @import("interface.zig");
-const std = @import("std");
 const builtin = @import("builtin");
+const Display = @import("../DisplayInterface.zig").Display;
+const locationInterface = @import("interface.zig");
+const nmea = @import("nmea.zig");
 const pigpio = @cImport(@cInclude("pigpio.h"));
 const pigpiod = @cImport(@cInclude("pigpiod_if2.h"));
+const std = @import("std");
 
 comptime {
     if (builtin.cpu.arch != .arm)
         @compileError("This file must be compiled for the Raspberry Pi.");
 }
 
-fn check(retval: c_int) !void {
+fn check(retval: c_int) SerialError!void {
     if (retval < 0) {
-        std.log.err("pigpio error: {d}", .{retval});
-        return error.pigpio;
+        std.log.err("pigpiod error: {d}", .{retval});
+        return error.Pigpiod;
     }
 }
 
-fn tryCheck(retval: c_int) !u32 {
+fn tryCheck(retval: c_int) SerialError!u32 {
     try check(retval);
     return @intCast(retval);
 }
@@ -34,16 +36,17 @@ const L96_RX = 22;
 const L96_TX = 27;
 const L96_BAUD = 9600;
 
+const SerialError = error{ Pigpiod, NoMorePoints };
+const Reader = std.io.Reader(*PointSrc, SerialError, serialRead);
+
 pub const PointSrc = @This();
 
 allocator: std.mem.Allocator,
+buffer: std.ArrayList(u8),
+display: ?*Display,
 handle: c_int,
-buffer: [128]u8,
-index: usize,
 
 pub fn init(allocator: std.mem.Allocator, options: locationInterface.PointSrcOptions) PointSrc {
-    _ = options;
-
     const handle = pigpiod.pigpio_start(null, null);
     if (handle < 0) @panic("pigpio_start() failed.");
 
@@ -66,28 +69,52 @@ pub fn init(allocator: std.mem.Allocator, options: locationInterface.PointSrcOpt
 
     return PointSrc{
         .allocator = allocator,
+        .buffer = std.ArrayList(u8).initCapacity(allocator, 128) catch unreachable,
+        .display = options.display,
         .handle = handle,
-        .buffer = undefined,
-        .index = 0,
     };
 }
 
 pub fn deinit(self: *PointSrc) void {
     check(pigpiod.bb_serial_read_close(self.handle, L96_RX)) catch unreachable;
     pigpiod.pigpio_stop(self.handle);
+    self.buffer.deinit();
+}
+
+fn serialRead(self: *PointSrc, buffer: []u8) SerialError!usize {
+    // The Reader interface specifies that returning zero indicates the
+    // end of the stream. But our stream is never ending and the pigpiod
+    // call often returns zero if there are no bytes currently available.
+    while (true) {
+        const bytesRead = try tryCheck(pigpiod.bb_serial_read(
+            self.handle,
+            L96_RX,
+            @ptrCast(buffer.ptr),
+            buffer.len,
+        ));
+        if (bytesRead > 0) return bytesRead;
+        std.time.sleep(10 * std.time.ns_per_ms);
+    }
 }
 
 pub fn nextPoint(self: *PointSrc) !locationInterface.Point {
-    std.time.sleep(100 * std.time.ns_per_ms);
-    const bytesRead = try tryCheck(pigpiod.bb_serial_read(
-        self.handle,
-        L96_RX,
-        @ptrCast(&self.buffer[self.index]),
-        self.buffer.len - self.index,
-    ));
-    std.log.info("bytesRead: {d} index: {d}", .{ bytesRead, self.index });
-    std.log.info("buffer:\n{s}", .{self.buffer});
-    self.index += bytesRead;
-    if (self.index >= self.buffer.len) self.index = 0;
-    return .{ .location = .{ .xy = .{ .x = 0, .y = 0 } } };
+    while (true) {
+        self.buffer.clearRetainingCapacity();
+        var reader = Reader{ .context = self };
+        try reader.streamUntilDelimiter(self.buffer.writer(), '\n', null);
+        const sentence = try nmea.parse(self.buffer.items);
+        std.log.debug("{s}", .{self.buffer.items});
+        // nmea.logSentence(sentence);
+
+        if (self.display) |dsp| {
+            switch (sentence) {
+                .GSV => |gsv| try dsp.setSatilitesInView(gsv.totalNumSat),
+                else => {},
+            }
+        }
+
+        if (nmea.extractPoint(sentence)) |point| {
+            return point;
+        }
+    }
 }

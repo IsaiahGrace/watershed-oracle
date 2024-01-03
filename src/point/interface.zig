@@ -1,5 +1,6 @@
 const builtin = @import("builtin");
 const config = @import("config");
+const Display = @import("../DisplayInterface.zig").Display;
 
 pub const PointTypes = enum {
     wkt,
@@ -23,12 +24,14 @@ pub const Point = struct {
 };
 
 pub const PointSrc = switch (config.pointProvider) {
-    .stdin => @import("stdin.zig"),
     .fuzzer => @import("fuzzer.zig"),
-    .gps => if (builtin.cpu.arch == .arm) @import("gps.zig") else @import("gpsMock.zig"),
+    .gps => @import("gps.zig"),
+    .gpsMock => @import("gpsMock.zig"),
     .scatter => @import("scatter.zig"),
+    .stdin => @import("stdin.zig"),
 };
 
 pub const PointSrcOptions = struct {
     json: bool = false,
+    display: ?*Display = null,
 };

@@ -13,6 +13,7 @@ const armCpuFeatures = "cortex_a53";
 const PointProviders = enum {
     fuzzer,
     gps,
+    gpsMock,
     scatter,
     stdin,
 };
@@ -132,16 +133,17 @@ pub fn build(b: *std.Build) !void {
     const clap = b.dependency("clap", .{ .target = target, .optimize = optimize });
     const clapArm = b.dependency("clap", .{ .target = targetArm, .optimize = optimize });
 
-    _ = try addWatershedExe(b, "arm-watershedCore", targetArm, optimize, clapArm, .stdin, .none);
-    _ = try addWatershedExe(b, "arm-watershedGui", targetArm, optimize, clapArm, .stdin, .framebuffer);
-
-    _ = try addWatershedExe(b, "watershedOracle", target, optimize, clap, .stdin, .none);
-    _ = try addWatershedExe(b, "watershedFuzzer", target, optimize, clap, .fuzzer, .none);
-    _ = try addWatershedExe(b, "watershedGuiSim", target, optimize, clap, .stdin, .windowed);
-    _ = try addWatershedExe(b, "watershedGPSMock", target, optimize, clap, .gps, .none);
-
     _ = try addPathUtilExe(b, "arm-pathUtil", targetArm, optimize, clapArm);
     _ = try addPathUtilExe(b, "pathUtil", target, optimize, clap);
+
+    _ = try addWatershedExe(b, "arm-watershedCore", targetArm, optimize, clapArm, .stdin, .none);
+    _ = try addWatershedExe(b, "arm-watershedDemo", targetArm, optimize, clapArm, .gpsMock, .framebuffer);
+    _ = try addWatershedExe(b, "arm-watershedGui", targetArm, optimize, clapArm, .gps, .framebuffer);
+
+    _ = try addWatershedExe(b, "watershedFuzzer", target, optimize, clap, .fuzzer, .none);
+    _ = try addWatershedExe(b, "watershedGPSMock", target, optimize, clap, .gpsMock, .none);
+    _ = try addWatershedExe(b, "watershedGuiSim", target, optimize, clap, .stdin, .windowed);
+    _ = try addWatershedExe(b, "watershedOracle", target, optimize, clap, .stdin, .none);
 
     // TESTS:
 
