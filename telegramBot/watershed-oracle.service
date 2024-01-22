@@ -1,0 +1,15 @@
+[Unit]
+Description=Watershed Oracle Telegram bot
+After=network.target
+
+[Service]
+Type=simple
+User=isaiah
+WorkingDirectory=/home/isaiah/repos/watershed-oracle/telegramBot
+ExecStartPre=/home/isaiah/.bun/bin/bun install
+ExecStart=/home/isaiah/.bun/bin/bun run main.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,7 @@
 module.exports = makeLineIterator;
 
+// I did not write this code. I found it online somewhere and now I can't find it again to attribute it correctly.
+// This is the kind of thing I'd really like to see in a language's standard library...
 
 async function* makeLineIterator(reader, lineGroupSize) {
     const utf8Decoder = new TextDecoder("utf-8");
