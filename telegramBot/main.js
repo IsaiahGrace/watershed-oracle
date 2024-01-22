@@ -63,7 +63,11 @@ bot.sendMessage(DEBUG_CHAT_ID, "Telegram Bot Bun server online.");
 
 for await (let line of makeLineIterator(proc.stdout.getReader(), 1)) {
     const stack = JSON.parse(line);
-    bot.sendMessage(stack.requestId, `Your point is in the following watersheds:
+
+    if (stack.pointNotInDataset) {
+        bot.sendMessage(stack.requestId, "Your point is outside the dataset and does not have watershed data available.");
+    } else {
+        bot.sendMessage(stack.requestId, `Your point is in the following watersheds:
 \`\`\`
 ${stack.huc2  ? "Level  2: " + stack.huc2.name  : ""}
 ${stack.huc4  ? "Level  4: " + stack.huc4.name  : ""}
@@ -74,5 +78,6 @@ ${stack.huc12 ? "Level 12: " + stack.huc12.name : ""}
 ${stack.huc14 ? "Level 14: " + stack.huc14.name : ""}
 ${stack.huc16 ? "Level 16: " + stack.huc16.name : ""}
 \`\`\``,
-    {parse_mode: "MarkdownV2"});
+        {parse_mode: "MarkdownV2"});
+    }
 }

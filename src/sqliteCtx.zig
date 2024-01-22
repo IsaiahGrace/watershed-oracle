@@ -12,7 +12,7 @@ pub const SqliteCtx = struct {
         try sqliteErrors.check(sqlite.sqlite3_open_v2(@ptrCast(path), &connectionPointer, sqlite.SQLITE_OPEN_READWRITE, null));
         if (connectionPointer == null) return error.sqliteOOM;
 
-        // These indicies will help with looking up the HUC codes
+        // These indices will help with looking up the HUC codes
         try sqliteErrors.check(sqlite.sqlite3_exec(
             connectionPointer,
             \\CREATE INDEX IF NOT EXISTS huc_index2 ON WBDHU2 (huc2, name);

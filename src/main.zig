@@ -39,8 +39,7 @@ pub fn main() !void {
         watershedStack.update(point) catch |e| {
             switch (e) {
                 error.pointNotInDataset => {
-                    std.log.err("Point not it dataset! Ignoring!", .{});
-                    continue;
+                    std.log.err("Point not it dataset!", .{});
                 },
                 else => return e,
             }
@@ -48,12 +47,14 @@ pub fn main() !void {
 
         if (cliArgs.json) {
             try watershedStack.printJSON();
-        } else {
+        } else if (watershedStack.valid()) {
             try watershedStack.printPoint();
             try watershedStack.printStack();
         }
 
-        try dsp.drawWatershedStack();
+        if (watershedStack.valid()) {
+            try dsp.drawWatershedStack();
+        }
     }
 }
 

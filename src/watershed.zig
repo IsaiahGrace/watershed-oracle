@@ -119,6 +119,21 @@ pub const WatershedStack = struct {
         self.sctx.deinit();
     }
 
+    pub fn valid(self: *const WatershedStack) bool {
+        if (self.huc2 != null or
+            self.huc4 != null or
+            self.huc6 != null or
+            self.huc8 != null or
+            self.huc10 != null or
+            self.huc12 != null or
+            self.huc14 != null or
+            self.huc16 != null)
+        {
+            return true;
+        }
+        return false;
+    }
+
     pub fn printPoint(self: *const WatershedStack) !void {
         const stdout_file = std.io.getStdOut().writer();
         var bw = std.io.bufferedWriter(stdout_file);
@@ -165,6 +180,11 @@ pub const WatershedStack = struct {
         try ws.beginObject();
         try ws.objectField("requestId");
         try ws.write(self.requestId);
+
+        if (!self.valid()) {
+            try ws.objectField("pointNotInDataset");
+            try ws.write(true);
+        }
 
         if (self.point) |point| {
             var writer = geos_c.GEOSWKTWriter_create_r(self.gctx.handle);
