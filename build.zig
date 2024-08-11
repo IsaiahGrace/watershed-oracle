@@ -27,44 +27,44 @@ const DisplayMode = enum {
 fn addWatershedExe(
     b: *std.Build,
     binaryName: []const u8,
-    target: std.zig.CrossTarget,
+    target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    clap: *std.build.Dependency,
+    clap: *std.Build.Dependency,
     pointProvider: PointProviders,
     displayMode: DisplayMode,
-) !*std.Build.CompileStep {
+) !*std.Build.Step.Compile {
     const exe = b.addExecutable(.{
         .name = binaryName,
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    if (target.getCpuArch() == .arm) {
-        exe.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc" });
-        exe.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf" });
-        exe.addLibraryPath(.{ .path = "lib/arm-linux-gnueabihf/lib" });
+    if (target.result.cpu.arch == .arm) {
+        exe.addIncludePath(b.path("lib/arm-linux-gnueabihf/inc"));
+        exe.addIncludePath(b.path("lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf"));
+        exe.addLibraryPath(b.path("lib/arm-linux-gnueabihf/lib"));
         exe.linkSystemLibrary("pigpiod_if2");
     }
 
     if (displayMode != .none) {
-        exe.addIncludePath(.{ .path = "lib/raylib" });
+        exe.addIncludePath(b.path("lib/raylib"));
     }
 
     exe.linkLibC();
     exe.linkSystemLibrary("geos_c");
     exe.linkSystemLibrary("sqlite3");
-    exe.addModule("clap", clap.module("clap"));
+    exe.root_module.addImport("clap", clap.module("clap"));
 
     const options = b.addOptions();
     options.addOption(DisplayMode, "displayMode", displayMode);
     options.addOption(PointProviders, "pointProvider", pointProvider);
-    exe.addOptions("config", options);
+    exe.root_module.addOptions("config", options);
 
     if (displayMode != .none) {
         exe.linkLibrary(
             raylib.addRaylib(b, target, optimize, .{
-                .arm = if (target.getCpuArch() == .arm) true else false,
+                .arm = if (target.result.cpu.arch == .arm) true else false,
                 .platform_drm = if (displayMode == .framebuffer) true else false,
                 .raudio = false,
                 .raygui = false,
@@ -82,31 +82,31 @@ fn addWatershedExe(
 fn addPathUtilExe(
     b: *std.Build,
     binaryName: []const u8,
-    target: std.zig.CrossTarget,
+    target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    clap: *std.build.Dependency,
-) !*std.Build.CompileStep {
+    clap: *std.Build.Dependency,
+) !*std.Build.Step.Compile {
     const options = b.addOptions();
     options.addOption(DisplayMode, "displayMode", .none);
     options.addOption(PointProviders, "pointProvider", .stdin);
 
     const pathUtil = b.addExecutable(.{
         .name = binaryName,
-        .root_source_file = .{ .path = "src/pathUtil.zig" },
+        .root_source_file = b.path("src/pathUtil.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    if (target.getCpuArch() == .arm) {
-        pathUtil.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc" });
-        pathUtil.addIncludePath(.{ .path = "lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf" });
-        pathUtil.addLibraryPath(.{ .path = "lib/arm-linux-gnueabihf/lib" });
+    if (target.result.cpu.arch == .arm) {
+        pathUtil.addIncludePath(b.path("lib/arm-linux-gnueabihf/inc"));
+        pathUtil.addIncludePath(b.path("lib/arm-linux-gnueabihf/inc/arm-linux-gnueabihf"));
+        pathUtil.addLibraryPath(b.path("lib/arm-linux-gnueabihf/lib"));
         pathUtil.linkLibC();
         pathUtil.linkSystemLibrary("pigpiod_if2");
     }
 
-    pathUtil.addModule("clap", clap.module("clap"));
-    pathUtil.addOptions("config", options);
+    pathUtil.root_module.addImport("clap", clap.module("clap"));
+    pathUtil.root_module.addOptions("config", options);
     b.installArtifact(pathUtil);
     return pathUtil;
 }
@@ -120,10 +120,11 @@ pub fn build(b: *std.Build) !void {
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
-    const targetArm = try std.zig.CrossTarget.parse(.{
+    const query = try std.Target.Query.parse(.{
         .arch_os_abi = armTargetTriplet,
         .cpu_features = armCpuFeatures,
     });
+    const targetArm = b.resolveTargetQuery(query);
 
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
@@ -148,15 +149,15 @@ pub fn build(b: *std.Build) !void {
     // TESTS:
 
     const tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    tests.addModule("clap", clap.module("clap"));
+    tests.root_module.addImport("clap", clap.module("clap"));
     tests.linkLibC();
     tests.linkSystemLibrary("geos_c");
     tests.linkSystemLibrary("sqlite3");
-    tests.addIncludePath(.{ .path = "lib/raylib" });
+    tests.addIncludePath(b.path("lib/raylib"));
     tests.linkLibrary(
         raylib.addRaylib(b, target, optimize, .{
             .arm = false,
@@ -172,7 +173,7 @@ pub fn build(b: *std.Build) !void {
     const options = b.addOptions();
     options.addOption(DisplayMode, "displayMode", .none);
     options.addOption(PointProviders, "pointProvider", .stdin);
-    tests.addOptions("config", options);
+    tests.root_module.addOptions("config", options);
 
     const run_core_tests = b.addRunArtifact(tests);
 
