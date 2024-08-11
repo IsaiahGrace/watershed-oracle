@@ -40,9 +40,10 @@ fn printHelp() !void {
     try stderr.print("cat gps_data_file | zig-out/bin/watershedOracle --database=/home/isaiah/Documents/WBD/WBD_National_GPKG.gpkg\n\n", .{});
 }
 
-pub fn parseArgs() !Args {
+pub fn parseArgs(allocator: std.mem.Allocator) !Args {
     var diag = clap.Diagnostic{};
-    var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
+    const res = clap.parse(clap.Help, &params, clap.parsers.default, .{
+        .allocator = allocator,
         .diagnostic = &diag,
     }) catch |err| {
         diag.report(std.io.getStdErr().writer(), err) catch {};

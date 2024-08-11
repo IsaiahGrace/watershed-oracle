@@ -25,18 +25,19 @@ const params = clap.parseParamsComptime(
 );
 
 pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer if (gpa.deinit() == .leak) std.log.err("GPA detected a leak!", .{});
+    const allocator: std.mem.Allocator = gpa.allocator();
+
     var diag = clap.Diagnostic{};
     var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
+        .allocator = allocator,
         .diagnostic = &diag,
     }) catch |err| {
         diag.report(std.io.getStdErr().writer(), err) catch {};
         return err;
     };
     defer res.deinit();
-
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer if (gpa.deinit() == .leak) std.log.err("GPA detected a leak!", .{});
-    const allocator: std.mem.Allocator = gpa.allocator();
 
     const stderr = std.io.getStdErr().writer();
 
