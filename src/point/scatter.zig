@@ -25,7 +25,7 @@ rng: std.rand.DefaultPrng,
 pub fn init(allocator: std.mem.Allocator, options: locationInterface.PointSrcOptions) PointSrc {
     _ = options;
     _ = allocator;
-    var rng = std.rand.DefaultPrng.init(@intCast(std.time.timestamp()));
+    const rng = std.rand.DefaultPrng.init(@intCast(std.time.timestamp()));
     return PointSrc{
         .rng = rng,
     };

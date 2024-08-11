@@ -140,7 +140,7 @@ pub const WatershedStack = struct {
         const stdout = bw.writer();
 
         if (self.point) |point| {
-            var writer = geos_c.GEOSWKTWriter_create_r(self.gctx.handle);
+            const writer = geos_c.GEOSWKTWriter_create_r(self.gctx.handle);
             defer geos_c.GEOSWKTWriter_destroy_r(self.gctx.handle, writer);
 
             const pointWKT = geos_c.GEOSWKTWriter_write_r(self.gctx.handle, writer, point);
@@ -187,7 +187,7 @@ pub const WatershedStack = struct {
         }
 
         if (self.point) |point| {
-            var writer = geos_c.GEOSWKTWriter_create_r(self.gctx.handle);
+            const writer = geos_c.GEOSWKTWriter_create_r(self.gctx.handle);
             defer geos_c.GEOSWKTWriter_destroy_r(self.gctx.handle, writer);
             const pointWKT = geos_c.GEOSWKTWriter_write_r(self.gctx.handle, writer, point);
             defer geos_c.GEOSFree_r(self.gctx.handle, pointWKT);
@@ -303,7 +303,7 @@ pub const WatershedStack = struct {
     pub fn updateWKT(self: *WatershedStack, newPoint: [*:0]const u8) !void {
         self.clearPoint();
 
-        var reader = geos_c.GEOSWKTReader_create_r(self.gctx.handle);
+        const reader = geos_c.GEOSWKTReader_create_r(self.gctx.handle);
         defer geos_c.GEOSWKTReader_destroy_r(self.gctx.handle, reader);
 
         self.point = geos_c.GEOSWKTReader_read_r(self.gctx.handle, reader, newPoint);
@@ -620,7 +620,7 @@ pub const WatershedStack = struct {
         @memcpy(newHuc[0..hucSpan.len], hucSpan);
 
         const nameSpan = std.mem.span(sqlite.sqlite3_column_text(statement, 2));
-        var newName = try self.allocator.alloc(u8, nameSpan.len);
+        const newName = try self.allocator.alloc(u8, nameSpan.len);
         errdefer self.allocator.free(newName);
         @memcpy(newName, nameSpan);
 
