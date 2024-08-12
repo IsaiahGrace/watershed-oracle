@@ -138,7 +138,8 @@ pub fn build(b: *std.Build) !void {
     _ = try addPathUtilExe(b, "pathUtil", target, optimize, clap);
 
     _ = try addWatershedExe(b, "arm-watershedCore", targetArm, optimize, clapArm, .stdin, .none);
-    _ = try addWatershedExe(b, "arm-watershedDemo", targetArm, optimize, clapArm, .gpsMock, .framebuffer);
+    _ = try addWatershedExe(b, "arm-watershedDemoNMEA", targetArm, optimize, clapArm, .gpsMock, .framebuffer);
+    _ = try addWatershedExe(b, "arm-watershedDemoWKT", targetArm, optimize, clapArm, .stdin, .framebuffer);
     _ = try addWatershedExe(b, "arm-watershedGui", targetArm, optimize, clapArm, .gps, .framebuffer);
 
     _ = try addWatershedExe(b, "watershedFuzzer", target, optimize, clap, .fuzzer, .none);
