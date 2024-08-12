@@ -1,4 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
+import OpenLocationCode from './openlocationcode.js';
 import makeLineIterator from './lineIterator.js';
 
 // The process.env Bun feature reads key-value pairs from several potential .env files.
@@ -15,27 +16,60 @@ const bot = new TelegramBot(SECRET_TOKEN, {
     polling: true
 });
 
-// Callback for all types of messages.
-bot.on('message', (msg) => {
-    // console.log(msg);
-});
-
-// Callback for messages with the 'location' feature.
-bot.on('location', (msg) => {
+function locationRequest(chat_id, longitude, latitude) {
     bot.sendMessage(DEBUG_CHAT_ID, "location request received");
 
     // Putting the write call to the Zig program in the callback ensures that the acknowledgement
     // message is delivered to the user first. The Zig lookup is so fast, that sometimes the
     // resulting watershed data would appear before the ack msg.
-    bot.sendMessage(msg.chat.id, "Received your location, calculating your watershed!").then(() => {
+    bot.sendMessage(chat_id, "Received your location, calculating your watershed!").then(() => {
         proc.stdin.write(JSON.stringify({
-            requestId: msg.chat.id,
-            longitude: msg.location.longitude,
-            latitude: msg.location.latitude,
+            requestId: chat_id,
+            longitude: longitude,
+            latitude: latitude,
         }));
         proc.stdin.write('\n');
         proc.stdin.flush();
     });
+}
+
+
+// Callback for all types of messages.
+bot.on('message', (msg) => {
+    console.log(msg);
+
+    // Handle messages with 'plus codes' in them. At the moment we can only support full length plus codes.
+    // For example: 85FQ5MHX+Q2
+    if ('text' in msg) {
+        const words = msg.text.split(' ');
+        for (let i in words) {
+            if (OpenLocationCode.isValid(words[i]) && OpenLocationCode.isFull(words[i])) {
+                const area = OpenLocationCode.decode(words[i]);
+                locationRequest(msg.chat.id, area.longitudeCenter, area.latitudeCenter);
+            }
+        }
+    }
+
+    // This kinda looks like a dead-end
+
+    // Parse google maps links
+    // Example: https://maps.app.goo.gl/CvPJ19XF8deHsWiq6
+    if ('link_preview_options' in msg) {
+        if ('url' in msg.link_preview_options) {
+            console.log(msg.link_preview_options.url);
+            const request = new Request(msg.link_preview_options.url, {
+                method: "HEAD"
+            });
+            fetch(request).then((response) => {
+                console.log(response);
+            })
+        }
+    }
+});
+
+// Callback for messages with the 'location' feature.
+bot.on('location', (msg) => {
+    locationRequest(msg.chat.id, msg.location.longitude, msg.location.latitude);
 });
 
 const proc = Bun.spawn(["../zig-out/bin/watershedOracle",
